@@ -1,0 +1,9 @@
+{
+  "prices": { "MSFT": 320, "BTC": 62000 },
+  "series": { "BTC.volume": [500000, 800000, 2000000] },
+  "indicatorOverrides": [
+    { "name": "RSI", "symbol": "MSFT", "period": 14, "value": 25 },
+    { "name": "MAVG", "symbol": "MSFT", "period": 50, "value": 350 },
+    { "name": "STDDEV", "symbol": "BTC", "period": 20, "value": 70000 }
+  ]
+}

@@ -1,0 +1,55 @@
+# Build artefacts (SBT / Scala)
+/target/
+/project/target/
+/project/project/
+/out/
+/lib_managed/
+/src_managed/
+/_*/
+
+# BSP / build servers / tools
+/.bsp/
+/.bloop/
+/.metals/
+/.ensime_cache/
+
+# class/jar/zip prodotti
+*.class
+*.jar
+*.war
+*.ear
+
+# Dependency caches
+/.ivy2/
+/.ivy/
+/.coursier/
+/coursier/
+/.cache/
+
+# IntelliJ IDEA
+*.iml
+/.idea/
+
+# IDE / editor temp files
+*.log
+*.tmp
+*.swp
+*~
+*.bak
+*.orig
+*.rej
+
+# local configuration
+.env
+local.properties
+credentials.sbt
+*.keystore
+*.jks
+secrets*.properties
+*.pem
+*.p12
+
+# Misc
+*.lock
+*.pyc
+.idea_modules/
