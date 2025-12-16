@@ -57,5 +57,8 @@ final case class InMemoryMarketData(
   def price(symbol: String): Option[BigDecimal] = prices.get(symbol)
   def series(symbol: String, field: String): Option[Vector[BigDecimal]] = seriesData.get(symbol -> field)
   override def indicatorOverride(name: String, symbol: String, period: Int): Option[BigDecimal] =
-    indicatorOverrides.get(IndicatorKey(name.toUpperCase, symbol, period))
+    // Lookup is case-insensitive on indicator name to match tests and common usage
+    indicatorOverrides.collectFirst {
+      case (IndicatorKey(n, s, p), v) if n.equalsIgnoreCase(name) && s == symbol && p == period => v
+    }
 }

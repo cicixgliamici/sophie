@@ -183,7 +183,7 @@ object Indicators {
     */
   def rsi(closes: Vector[BigDecimal], n: Int): BigDecimal = {
     if (closes.length <= n) throw new IllegalArgumentException(s"Need > $n points, got ${closes.length}")
-    val deltas = closes.sliding(2).toVector.map { case Vector(a,b) => b - a }
+    val deltas = closes.sliding(2).toVector.collect { case Vector(a,b) => b - a }
     val gains  = deltas.map(d => if (d > 0) d else BigDecimal(0))
     val losses = deltas.map(d => if (d < 0) -d else BigDecimal(0))
 

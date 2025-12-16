@@ -3,9 +3,12 @@ package engine
 import ast._
 
 object Executor {
-  /** Execute the list of instructions: update portfolio and append to ledger. */
-  def run(instructions: List[Instruction], md: MarketData, pf: PortfolioStore, ledger: Ledger, source: String = "repl"): Unit = {
+  /** Execute the list of instructions: update portfolio and append to ledger.
+    * Now returns the list of LedgerEvent produced for further reporting.
+    */
+  def run(instructions: List[Instruction], md: MarketData, pf: PortfolioStore, ledger: Ledger, source: String = "repl"): List[LedgerEvent] = {
     var portfolio = pf.load().withDefaultValue(BigDecimal(0))
+    var produced = List.empty[LedgerEvent]
 
     instructions.foreach { instr =>
       val px = instr.price.orElse(md.price(instr.symbol))
@@ -30,8 +33,10 @@ object Executor {
         note = instr.note
       )
       ledger.append(event)
+      produced ::= event
     }
 
     pf.save(portfolio.filter(_._2 > 0))
+    produced.reverse
   }
 }

@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import upickle.default.{read, write}
 import frontend.MdJsonCodec
 import frontend.PortfolioJson
+import frontend.ReceiptPrinter
 
 object SophieTui {
 
@@ -303,8 +304,9 @@ object SophieTui {
       ensureParentDir("data/ledger.ndjson")
       val pfStore = FileJsonPortfolioStore(Paths.get("data/portfolio.json"))
       val ledger  = FileLedger(Paths.get("data/ledger.ndjson"))
-      Executor.run(instrs, md, pfStore, ledger, source = s"ir:${Paths.get(path).getFileName}")
+      val events = Executor.run(instrs, md, pfStore, ledger, source = s"ir:${Paths.get(path).getFileName}")
       println(s"Executed ${instrs.size} instruction(s). Portfolio saved, ledger appended.")
+      ReceiptPrinter.printReceipts(events)
     } catch { case e: Exception => println(s"Error executing IR: ${e.getMessage}") }
   }
 

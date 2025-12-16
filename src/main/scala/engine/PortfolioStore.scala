@@ -20,7 +20,7 @@ final case class FileJsonPortfolioStore(path: Path) extends PortfolioStore {
     }
 
   override def save(pf: Map[String, BigDecimal]): Unit = {
-    val json = write(PortfolioJson.PortfolioJ(pf.filter(_._2 > 0)), indent = 2)
+    val json = write(PortfolioJ(pf.filter(_._2 > 0)), indent = 2)
     Files.writeString(path, json, UTF_8)
   }
 }

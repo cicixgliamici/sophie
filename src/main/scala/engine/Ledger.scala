@@ -37,6 +37,6 @@ final case class FileLedger(path: Path) extends Ledger {
     if (!Files.exists(path)) return Vector.empty
     import scala.jdk.CollectionConverters._
     Files.readAllLines(path, UTF_8).asScala
-      .filter(_.trim.nonEmpty).toVector.map(read[LedgerEvent])
+      .filter(_.trim.nonEmpty).toVector.map(s => read[LedgerEvent](s))
   }
 }
