@@ -10,6 +10,10 @@ import engine._
 import ast._
 
 class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinter) {
+  // Manages the portfolio state used by the TUI and encapsulates all
+  // persistence/printing logic. This way we can reuse the same functions in
+  // both the interactive interface and automated tests.
+  
   private var portfolio: Map[String, BigDecimal] = Map.empty.withDefaultValue(BigDecimal(0))
 
   private def fmt(x: BigDecimal): String = x.bigDecimal.stripTrailingZeros.toPlainString
