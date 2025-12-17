@@ -2,11 +2,10 @@ package engine
 
 import org.scalatest.funsuite.AnyFunSuite
 import ast._
-import frontend.PortfolioJson._
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
 import frontend.MdJsonCodec._
+import frontend.PortfolioJson._
 
 class ExecutorPortfolioTest extends AnyFunSuite {
 
@@ -31,7 +30,7 @@ class ExecutorPortfolioTest extends AnyFunSuite {
 
         // portfolio file should contain MSFT: 5
         val loaded = pfStore.load()
-        assert(loaded("MSFT") == BigDecimal(5))
+        assert(loaded.positions("MSFT") == BigDecimal(5))
 
         // ledger should have one event
         val lines = ledger.readAll()
@@ -49,7 +48,7 @@ class ExecutorPortfolioTest extends AnyFunSuite {
     withTempFile { pfPath =>
       val pfStore = FileJsonPortfolioStore(pfPath)
       // initialize portfolio with 2 BTC
-      pfStore.save(Map("BTC" -> BigDecimal(2)))
+      pfStore.save(PortfolioState(Map("BTC" -> BigDecimal(2)), cash = BigDecimal(0)))
 
       val ledgerPath = Files.createTempFile("sophie-ledger", ".ndjson")
       try {
@@ -59,7 +58,7 @@ class ExecutorPortfolioTest extends AnyFunSuite {
         val events = Executor.run(List(instr), md, pfStore, ledger, source = "test")
 
         val loaded = pfStore.load()
-        assert(loaded("BTC") == BigDecimal(0))
+        assert(loaded.positions("BTC") == BigDecimal(0))
       } finally {
         Files.deleteIfExists(ledgerPath)
       }
@@ -69,13 +68,15 @@ class ExecutorPortfolioTest extends AnyFunSuite {
   test("PortfolioJson roundtrip writes and reads expected JSON") {
     withTempFile { pfPath =>
       val pfStore = FileJsonPortfolioStore(pfPath)
-      pfStore.save(Map("AAPL" -> BigDecimal(10), "MSFT" -> BigDecimal(0)))
+      pfStore.save(PortfolioState(Map("AAPL" -> BigDecimal(10), "MSFT" -> BigDecimal(0)), cash = BigDecimal(1234)))
       val loaded = pfStore.load()
-      assert(loaded("AAPL") == BigDecimal(10))
-      assert(loaded("MSFT") == BigDecimal(0))
+      assert(loaded.positions("AAPL") == BigDecimal(10))
+      assert(loaded.positions("MSFT") == BigDecimal(0))
+      assert(loaded.cash == BigDecimal(1234))
       // file content non-empty
       val content = Files.readString(pfPath)
       assert(content.contains("AAPL"))
+      assert(content.contains("cash"))
     }
   }
 }
