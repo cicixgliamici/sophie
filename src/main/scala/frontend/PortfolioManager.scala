@@ -13,24 +13,27 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
   // Manages the portfolio state used by the TUI and encapsulates all
   // persistence/printing logic. This way we can reuse the same functions in
   // both the interactive interface and automated tests.
-  
-  private var portfolio: Map[String, BigDecimal] = Map.empty.withDefaultValue(BigDecimal(0))
+
+  private var portfolio: PortfolioState = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
+  private def positions: Map[String, BigDecimal] = portfolio.positions.withDefaultValue(BigDecimal(0))
 
   private def fmt(x: BigDecimal): String = x.bigDecimal.stripTrailingZeros.toPlainString
   private def fmtQty(x: BigDecimal): String = try { x.setScale(10, RoundingMode.HALF_UP).bigDecimal.stripTrailingZeros.toPlainString } catch { case _: Throwable => x.bigDecimal.stripTrailingZeros.toPlainString }
 
   def reset(): Unit = {
-    portfolio = Map.empty.withDefaultValue(BigDecimal(0))
+    portfolio = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
     printer.printlnLine("Portfolio reset.")
   }
 
-  def getPortfolio: Map[String, BigDecimal] = portfolio
+  def getPortfolio: Map[String, BigDecimal] = portfolio.positions
+  def getPortfolioState: PortfolioState = portfolio
 
   def show(): Unit = {
     printer.printlnLine("\n=== Portfolio ===")
-    if (portfolio.isEmpty) printer.printlnLine(" - (empty)")
+    if (portfolio.positions.isEmpty) printer.printlnLine(" - (empty)")
+    if (portfolio.cash != 0) printer.printlnLine(s" - cash: ${fmt(portfolio.cash)}")
     var total: BigDecimal = 0
-    portfolio.toSeq.sortBy(_._1).foreach { case (sym, qty) =>
+    portfolio.positions.toSeq.sortBy(_._1).foreach { case (sym, qty) =>
       val line = priceFn(sym) match {
         case Some(px) =>
           val v = qty * px; total += v
@@ -39,7 +42,7 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
       }
       printer.printlnLine(" - " + line)
     }
-    if (total > 0) printer.printlnLine(s"Total M2M value ~ ${fmt(total)}")
+    if (total > 0 || portfolio.cash != 0) printer.printlnLine(s"Total M2M value ~ ${fmt(total + portfolio.cash)}")
     printer.printlnLine("")
   }
 
@@ -48,7 +51,7 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
       val p = Paths.get(path)
       val parent = p.getParent
       if (parent != null && !Files.exists(parent)) Files.createDirectories(parent)
-      val json = write(PortfolioJson.PortfolioJ(portfolio.filter(_._2 > 0)), indent = 2)
+      val json = write(PortfolioJson.PortfolioJ(portfolio.positions.filter(_._2 > 0), Some(portfolio.cash)), indent = 2)
       Files.writeString(p, json, UTF_8)
       printer.printlnLine(s"Saved portfolio to $path")
     } catch { case NonFatal(e) => printer.printlnLine(s"Error saving portfolio: ${e.getMessage}") }
@@ -58,8 +61,8 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
     try {
       val json = Files.readString(Paths.get(path), UTF_8)
       val pj = read[PortfolioJson.PortfolioJ](json)
-      portfolio = pj.positions.withDefaultValue(BigDecimal(0))
-      printer.printlnLine(s"Loaded portfolio from $path (positions=${portfolio.count(_._2>0)})")
+      portfolio = PortfolioState(pj.positions.withDefaultValue(BigDecimal(0)), pj.cash.getOrElse(BigDecimal(0)))
+      printer.printlnLine(s"Loaded portfolio from $path (positions=${portfolio.positions.count(_._2>0)})")
     } catch { case NonFatal(e) => printer.printlnLine(s"Error loading portfolio: ${e.getMessage}") }
   }
 
@@ -84,7 +87,7 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
                   BigDecimal(0)
               }
             if (qty > 0) {
-              val cur = portfolio(sym)
+              val cur = positions(sym)
               val next = d.cmd.action match {
                 case ast.Buy  => cur + qty
                 case ast.Sell => (cur - qty).max(BigDecimal(0))
@@ -93,7 +96,7 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
                 if (d.cmd.action == ast.Sell && cur == 0) {
                   printer.printlnLine(s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
                 } else {
-                  portfolio = portfolio.updated(sym, next)
+                  portfolio = portfolio.copy(positions = portfolio.positions.updated(sym, next))
                   applied += 1
                 }
               } else {
@@ -103,7 +106,7 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
               printer.printlnLine(s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
             }
           }
-          portfolio = portfolio.filter { case (_, q) => q > 0 }
+          portfolio = portfolio.copy(positions = portfolio.positions.filter { case (_, q) => q > 0 })
           printer.printlnLine(s"Applied $applied trade(s) to portfolio.")
           show()
           applied
@@ -133,20 +136,20 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
                   BigDecimal(0)
               }
             if (qty > 0) {
-              val cur = tmp.withDefaultValue(BigDecimal(0))(sym)
+              val cur = tmp.positions.withDefaultValue(BigDecimal(0))(sym)
               val next = d.cmd.action match {
                 case ast.Buy  => cur + qty
                 case ast.Sell => (cur - qty).max(BigDecimal(0))
               }
               if (next != cur) {
                 if (d.cmd.action == ast.Sell && cur == 0) printer.printlnLine(s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
-                else { tmp = tmp.updated(sym, next); applied += 1 }
+                else { tmp = tmp.copy(positions = tmp.positions.updated(sym, next)); applied += 1 }
               } else printer.printlnLine(s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
             } else printer.printlnLine(s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
           }
           printer.printlnLine(s"Preview: would apply $applied trade(s). Resulting portfolio:")
-          if (tmp.isEmpty) printer.printlnLine(" - (empty)")
-          else tmp.toSeq.sortBy(_._1).foreach { case (s,q) => printer.printlnLine(s" - $s: qty=${fmt(q)}") }
+          if (tmp.positions.isEmpty) printer.printlnLine(" - (empty)")
+          else tmp.positions.toSeq.sortBy(_._1).foreach { case (s,q) => printer.printlnLine(s" - $s: qty=${fmt(q)}") }
           tmp
         }
     }
