@@ -4,6 +4,19 @@ import upickle.default._
 import java.nio.file.{Files, Path, StandardOpenOption}
 import java.nio.charset.StandardCharsets.UTF_8
 
+/**
+  * Ledger
+  * ------
+  * Small persistence layer that records executed trades as append-only events.
+  * Keeping this layer narrow makes it easy to swap file storage for a database
+  * later without touching the execution engine.
+  *
+  * Tips for readers:
+  *   - Events are stored as NDJSON for easy streaming and grepping.
+  *   - `Ledger` is an interface; `FileLedger` is a minimal default implementation
+  *     used by the TUI and tests. Swapping in-memory or cloud-backed ledgers only
+  *     requires implementing the two methods.
+  */
 final case class LedgerEvent(
                               ts: Long,
                               action: ast.TradeAction,
