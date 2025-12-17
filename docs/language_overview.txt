@@ -1,0 +1,34 @@
+Sophie language and architecture overview
+========================================
+This note summarizes what the Sophie DSL can express today and how the codebase is layered to execute it. It is intended as a quick reference for presentations or onboarding.
+
+Language surface 
+-------------------------------------
+- Program shape: a file is a Program made of ordered statements.
+- Trade commands: BUY or SELL a symbol for a Value (amount + currency) guarded by an optional IF condition. If the IF part is omitted, the condition defaults to AlwaysTrue.
+- Portfolio command: PORTFOLIO with one or more allocations, each specifying a Value and a target symbol. Only one portfolio block is honored per program; the first one wins.
+- Conditions: AND/OR combinations, comparisons (>, <, ==, !=) between operands, parenthesis, or a truthy check of any expression (treated as "!= 0").
+- Operands you can compare or combine arithmetically:
+  - Number literals.
+  - PRICE(symbol) lookup.
+  - Series operations like BTC.close via SERIES(symbol, field).
+  - Indicators such as MAVG/EMA/STDDEV/RSI over closes via INDICATOR(name, symbol, period).
+  - Arithmetic Binary expressions with +, -, *, / (division keeps scale and guards against /0).
+
+Runtime layers 
+-------------------------------------
+1) Parsing: SophieParserFacade wraps the ANTLR-generated lexer/parser and turns source text into a parse tree. SophieAstBuilder converts the tree into the typed AST used everywhere else.
+2) Evaluation: engine.Evaluator walks the AST against MarketData, deciding which trades should execute and capturing portfolio targets. Indicator computations live in engine.Indicators.
+3) Lowering: engine.Lowering transforms the ExecutionPlan into concrete Instruction objects (JSON-ready), resolving money-to-quantity conversions with current prices.
+4) Execution: engine.Executor applies Instructions, resolves live prices when needed, mutates the portfolio store, and appends events to the ledger while emitting human-readable receipts.
+5) Frontends:
+   - CLI (cli.SophieCli): batch flow that loads a Sophie file, market data (demo or user-supplied), prints the plan, optionally prints instructions, and optionally executes them.
+   - TUI (frontend.SophieTui): interactive REPL that wires user commands through CommandHandler and ProgramEvaluator, keeps a PortfolioManager in memory, and can write ledger/portfolio snapshots.
+6) Persistence and I/O: FileJsonPortfolioStore and FileLedger manage on-disk state; ReceiptPrinter can append printable receipts. MarketData abstractions supply prices, series, and indicator overrides.
+
+Current limitations to be aware of
+----------------------------------
+- Only one portfolio command is considered; additional ones are ignored.
+- Division by zero and missing market data are surfaced as runtime errors.
+- Indicator support is limited to SMA (MAVG), EMA, STDDEV, and RSI over close prices.
+- No order types beyond BUY/SELL market-style instructions are modeled today.
