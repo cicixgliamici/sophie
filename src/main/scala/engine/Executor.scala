@@ -15,7 +15,8 @@ object Executor {
     * We return produced events so callers and tests can inspect or print them.
     */
   def run(instructions: List[Instruction], md: MarketData, pf: PortfolioStore, ledger: Ledger, source: String = "repl"): List[LedgerEvent] = {
-    var portfolio = pf.load().withDefaultValue(BigDecimal(0))
+    var pfState = pf.load().withDefaults
+    var portfolio = pfState.positions
     var produced = List.empty[LedgerEvent]
 
 
@@ -53,7 +54,8 @@ object Executor {
     }
 
     // Persist only positive positions to keep the file tidy.
-    pf.save(portfolio.filter(_._2 > 0))
+    pfState = pfState.copy(positions = portfolio).onlyPositivePositions
+    pf.save(pfState)
     produced.reverse
   }
 }
