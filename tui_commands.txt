@@ -19,4 +19,3 @@ SELL 0.5 BTC OF BTC IF BTC.volume > 1000000 && STDDEV(BTC, 20) > PRICE(BTC);
 :compile ir tmp/ir.json
 :exec ir tmp/ir.json
 :q
-

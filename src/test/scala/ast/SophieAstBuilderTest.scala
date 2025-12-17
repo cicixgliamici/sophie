@@ -2,6 +2,7 @@ package ast
 
 import org.scalatest.funsuite.AnyFunSuite
 import frontend.SophieParserFacade
+import engine.{Evaluator, InMemoryMarketData}
 
 class SophieAstBuilderTest extends AnyFunSuite {
 
@@ -40,5 +41,24 @@ class SophieAstBuilderTest extends AnyFunSuite {
     val t = ast.statements.head.asInstanceOf[TradeCmd]
     assert(t.symbol == "BTC")
     assert(t.condition.isInstanceOf[And] == false) // single comparison
+  }
+
+  test("BUY without IF is parsed and treated as AlwaysTrue") {
+    val src = "BUY 1500 EUR OF MSFT;"
+    val ast = SophieParserFacade.parseString(src)
+    val t = ast.statements.head.asInstanceOf[TradeCmd]
+    assert(t.action == Buy)
+    assert(t.value == Value(BigDecimal(1500), "EUR"))
+    assert(t.symbol == "MSFT")
+    assert(t.condition == AlwaysTrue)
+  }
+
+  test("Evaluator executes BUY without IF") {
+    val src = "BUY 1500 EUR OF MSFT;"
+    val program = SophieParserFacade.parseString(src)
+    val md = InMemoryMarketData() // empty market data is fine; AlwaysTrue does not need prices
+    val plan = Evaluator.evaluate(program, md)
+    assert(plan.trades.nonEmpty)
+    assert(plan.trades.head.shouldExecute)
   }
 }

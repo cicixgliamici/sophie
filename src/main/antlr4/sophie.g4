@@ -44,7 +44,7 @@ PORTFOLIO  : 'PORTFOLIO' ;
   IDENTIFIER comes after keywords (very important). This prevents keywords from
   being lexed as generic identifiers.
 */
-IDENTIFIER : [A-Za-z_][A-Za-z0-9_]* ;
+IDENTIFIER : [A-Za-z_][A-Za-z0-9_]*  ;
 
 /* Punctuation */
 SEMICOLON  : ';' ;   // Statement separator
@@ -97,7 +97,7 @@ statement
   allow both IDENTIFIER and CURRENCY to represent a tradable instrument.
 */
 trade_cmd
-  : (BUY | SELL) value OF symbol IF condition
+  : (BUY | SELL) value OF symbol (IF condition)?
   ;
 
 /*
@@ -256,4 +256,3 @@ symbol
      in function windows to accept both 14 and 14.0.
    - `symbol` rule: lets currency tickers act as instruments wherever an
      identifier was previously required (e.g., "OF BTC", "BTC.close").
-

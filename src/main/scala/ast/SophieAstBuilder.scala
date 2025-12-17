@@ -86,7 +86,7 @@ object SophieAstBuilder {
 
     val cond =
       if (ctx.condition() != null) fromCondition(ctx.condition())
-      else throw new IllegalArgumentException("Trade command requires a condition after IF")
+      else AlwaysTrue
 
     TradeCmd(action = action, value = v, symbol = sym, condition = cond)
   }

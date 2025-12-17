@@ -54,6 +54,9 @@ final case class And(left: Condition, right: Condition) extends Condition
 final case class Or(left: Condition, right: Condition) extends Condition
 final case class Parens(cond: Condition) extends Condition
 
+// A sentinel condition meaning "always true" (used when IF is omitted)
+case object AlwaysTrue extends Condition
+
 // Operands
 sealed trait Operand extends AST
 final case class SeriesOperation(symbol: String, field: String) extends Operand

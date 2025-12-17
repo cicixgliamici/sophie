@@ -4,14 +4,29 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="Prime modifiche">
-      <change afterPath="$PROJECT_DIR$/run-fat.bat" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/run-fat.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tui_commands.txt" afterDir="false" />
+    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="Fat Jar">
+      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/CommandHandler.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/PortfolioManager.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/ProgramEvaluator.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/TuiPrinter.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/ExecutorPortfolioTest.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiIntegrationSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiSpec.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/build.sbt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/project/plugins.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/project/plugins.sbt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/ReceiptPrinter.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/ReceiptPrinter.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/quick_test_fixed.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/run-fat.bat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/run-fat.ps1" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/antlr4/sophie.g4" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/antlr4/sophie.g4" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/sophie.interp" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/sophie.interp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/sophieParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/sophieParser.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/ast/AST.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/ast/AST.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/ast/SophieAstBuilder.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/ast/SophieAstBuilder.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/Evalutator.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/Evalutator.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/SophieTui.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/SophieTui.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/scala/ast/SophieAstBuilderTest.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/ast/SophieAstBuilderTest.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/scala/parser/SyntaxErrorTest.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/parser/SyntaxErrorTest.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tmp/md_out.json" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/md_out.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tui_commands.txt" beforeDir="false" afterPath="$PROJECT_DIR$/tui_commands.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -156,7 +171,7 @@
       <workItem from="1759587880308" duration="16317000" />
       <workItem from="1765903981933" duration="474000" />
       <workItem from="1765904837736" duration="4461000" />
-      <workItem from="1765981517069" duration="4392000" />
+      <workItem from="1765981517069" duration="10833000" />
     </task>
     <task id="LOCAL-00001" summary="Test!">
       <option name="closed" value="true" />
@@ -182,7 +197,15 @@
       <option name="project" value="LOCAL" />
       <updated>1765909495624</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Fat Jar">
+      <option name="closed" value="true" />
+      <created>1765986005860</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1765986005860</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -191,7 +214,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Test!" />
     <MESSAGE value="Prime modifiche" />
-    <option name="LAST_COMMIT_MESSAGE" value="Prime modifiche" />
+    <MESSAGE value="Fat Jar" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fat Jar" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

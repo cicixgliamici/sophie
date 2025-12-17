@@ -44,8 +44,8 @@ object Evaluator {
     val ok = evalCondition(cmd.condition, md)
     val what = cmd.action match { case Buy => "BUY"; case Sell => "SELL" }
     val reason =
-      if (ok) s"$what ${cmd.value.amount} ${cmd.value.currency} OF ${cmd.symbol} — condition met"
-      else    s"$what ${cmd.value.amount} ${cmd.value.currency} OF ${cmd.symbol} — condition NOT met"
+      if (ok) s"$what ${cmd.value.amount} ${cmd.value.currency} OF ${cmd.symbol} - condition met"
+      else    s"$what ${cmd.value.amount} ${cmd.value.currency} OF ${cmd.symbol} - condition NOT met"
     TradeDecision(cmd, ok, reason)
   }
 
@@ -58,6 +58,7 @@ object Evaluator {
     * Supports logical operators and parenthesis.
     */
   private def evalCondition(c: Condition, md: MarketData): Boolean = c match {
+    case AlwaysTrue => true
     case Comparison(l, op, r) =>
       val lv = evalOperand(l, md)
       val rv = evalOperand(r, md)
