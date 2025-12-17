@@ -3,7 +3,10 @@ package frontend
 import scala.math.BigDecimal
 
 class CommandHandler(priceLookup: String => Option[BigDecimal], portfolioManager: PortfolioManager, printer: TuiPrinter) {
-
+  
+  // This component encapsulates TUI command dispatching so `SophieTui` can stay
+  // focused on the input/output loop. It is the central switch, easy to extend
+  // in the lab by adding new cases.
   // helper to expose price lookup to portfolio manager
   private def priceFn(sym: String): Option[BigDecimal] = priceLookup(sym)
 
