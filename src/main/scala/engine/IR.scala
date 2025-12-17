@@ -3,7 +3,21 @@ package engine
 import ast._
 import upickle.default._
 
-/** Executable instruction produced from the plan (portable JSON). */
+/**
+  * Intermediate Representation (IR)
+  * --------------------------------
+  * Bridges the gap between a high-level `ExecutionPlan` and a serialized, portable
+  * instruction list. The IR layer keeps execution details stable and auditable even
+  * if the planner or evaluator evolve.
+  *
+  * Design notes:
+  *   - `Instruction` is intentionally data-only: no side effects, easy to persist.
+  *   - `Lowering.from` filters out SKIP trades, converts money amounts to share
+  *     quantities, and tags each instruction with a deterministic-ish id for
+  *     traceability.
+  *   - JSON codecs are defined locally so the IR stays self-contained and can be
+  *     used by CLI tools or tests without importing unrelated modules.
+  */
 final case class Instruction(
                               id: String,
                               action: TradeAction,
