@@ -1,0 +1,41 @@
+TUI request-to-execution pipeline
+====================================================
+
+Startup
+-------
+1) The executable entry point is `TuiMain.main`, which launches the console by calling `SophieTui.run()`.
+2) `SophieTui` initializes in-memory market data, the last evaluated execution plan, and binds a `PortfolioManager` plus a `CommandHandler` so command dispatch is centralized.
+
+Handling user input
+-------------------
+1) The REPL loop in `SophieTui.run` reads a line, normalizes it (trims BOM/control chars), and decides the path:
+   - Lines starting with `:` are treated as TUI commands.
+   - Blank line closes any buffered DSL program and triggers evaluation.
+   - Any other line is appended verbatim to the program buffer.
+2) When the buffer is empty and the user signals EOF (Ctrl+D), the loop exits and prints "Bye.".
+
+When a TUI command is entered
+-----------------------------
+1) `SophieTui` forwards the raw command string (and the current buffer) to `CommandHandler.handle`.
+2) `CommandHandler` pattern-matches the command tokens and routes to helpers on `SophieTui` or `PortfolioManager`:
+   - Market data edits (`:set price`, `:set series`, `:set ovr`) call into `SophieTui` mutators that update the in-memory market snapshot.
+   - Persistence (`:load md`, `:save md`, `:save prog`) uses `SophieTui` helpers to read/write JSON or source files.
+   - Portfolio operations (`:pf new|show|apply|preview|save|load`) delegate to `PortfolioManager`, which reads prices through the injected lookup and emits output via the shared printer.
+   - IR interactions (`:compile ir`, `:exec ir`) call back to `SophieTui` to lower the last plan to JSON instructions or to execute an IR file via `Executor.run`, persisting the resulting portfolio and ledger.
+3) The handler returns a boolean indicating whether the REPL should continue; `:q`/`:quit` short-circuit the loop.
+
+When a DSL program is submitted
+-------------------------------
+1) The buffered program source is passed to `ProgramEvaluator.evaluate` along with current market data.
+2) `ProgramEvaluator` orchestrates:
+   a) `SophieParserFacade.parseString` builds the AST from DSL text.
+   b) `Evaluator.evaluate` walks the AST to produce an `ExecutionPlan` (trades + optional portfolio targets).
+   c) Any missing prices needed for currency-to-quantity conversions are collected as warnings.
+3) Control returns to `SophieTui.evalAndPrint`, which stores the latest plan and program, prints warnings, and renders the plan via the shared `TuiPrinter`.
+4) The last plan is now available for portfolio commands (e.g., `:pf apply`), IR compilation, or inspection.
+
+Applying a plan to the portfolio
+--------------------------------
+1) When the user calls `:pf apply`, `CommandHandler` routes to `PortfolioManager.applyPlan`, passing the last plan and a price lookup that resolves symbols from current market data.
+2) `PortfolioManager` filters trades marked `EXECUTE`, converts value-based orders to quantities using prices, updates in-memory holdings, and prints skips for missing prices or no-op trades.
+3) The updated portfolio can be saved with `:pf save` or previewed without mutation via `:pf preview`.
