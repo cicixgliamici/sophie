@@ -1,0 +1,17 @@
+:help
+:show md
+:set price MSFT 350
+:set series MSFT close 300,305,302,301,303,304,306,307,308,309,310,311,312,313,314,315,316,317,318,319
+:set series BTC volume 1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000,14000,15000,16000,17000,18000,19000,20000
+
+BUY 1500 EUR OF MSFT IF RSI(MSFT, 14) < 30 && MAVG(MSFT, 5) > PRICE(MSFT);
+SELL 0.5 BTC OF BTC IF BTC.volume > 10000;
+
+:pf new
+:pf show
+:pf apply
+:pf show
+:compile ir tmp/ir.json
+:exec ir tmp/ir.json
+:save md tmp/md_out.json
+:q

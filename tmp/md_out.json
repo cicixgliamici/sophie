@@ -1,0 +1,13 @@
+{
+  "prices": {
+    "MSFT": "350"
+  },
+  "series": {
+    "BTC.volume": [
+      "100000",
+      "2000000",
+      "3000000"
+    ]
+  },
+  "indicatorOverrides": []
+}

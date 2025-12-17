@@ -4,6 +4,9 @@
 ThisBuild / version      := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.3.6"
 
+// Default main class for convenience (TUI)
+ThisBuild / mainClass := Some("TuiMain")
+
 // ==============================
 // sbt-antlr4 plugin
 // ==============================
@@ -29,6 +32,30 @@ libraryDependencies += "org.antlr" % "antlr4-runtime" % "4.13.2"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % Test
 
 libraryDependencies += "com.lihaoyi" %% "upickle" % "3.1.2"
+
+// ==============================
+// assembly (fat JAR) settings
+// ==============================
+// sbt-assembly is added in project/plugins.sbt; the snippet below
+// configures the generated jar name, the main class and a basic
+// merge strategy to avoid common META-INF clashes.
+import sbtassembly.AssemblyPlugin.autoImport._
+import sbtassembly.{MergeStrategy, PathList}
+
+assembly / assemblyJarName := "sophie-fat.jar"
+
+// Main class: project currently uses top-level object `TuiMain`, so FQN is "TuiMain".
+assembly / mainClass := Some("TuiMain")
+
+assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", xs @ _*) =>
+    xs.map(_.toLowerCase) match {
+      case ms if ms.exists(m => m.endsWith(".sf") || m.endsWith(".rsa") || m.endsWith(".dsa")) => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    }
+  case "reference.conf" => MergeStrategy.concat
+  case other => MergeStrategy.first
+}
 
 // ==============================
 // Notes & How it works

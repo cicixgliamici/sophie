@@ -4,16 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="Test!">
-      <change afterPath="$PROJECT_DIR$/src/main/scala/cli/SophieCli.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/ReceiptPrinter.scala" afterDir="false" />
+    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="Prime modifiche">
+      <change afterPath="$PROJECT_DIR$/run-fat.bat" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/run-fat.ps1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tui_commands.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/Evalutator.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/Evalutator.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/Executor.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/Executor.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/Ledger.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/Ledger.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/MarketData.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/MarketData.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/PortfolioStore.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/PortfolioStore.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/SophieTui.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/SophieTui.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/build.sbt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/project/plugins.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/project/plugins.sbt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/ReceiptPrinter.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/ReceiptPrinter.scala" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -52,18 +50,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "cicixgliamici"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;cicixgliamici&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/cicixgliamici/sophie.git",
-    "accountId": "f5dbce4b-2a3e-4ec3-af03-c4edb08bf244"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/cicixgliamici/sophie.git&quot;,
+    &quot;accountId&quot;: &quot;f5dbce4b-2a3e-4ec3-af03-c4edb08bf244&quot;
   }
-}]]></component>
+}</component>
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="CurrentFile" />
   </component>
@@ -78,32 +76,33 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Application.Main.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "git-widget-placeholder": "master",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Modules",
-    "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.0",
-    "settings.editor.selected.configurable": "configurable.group.appearance",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Application.Main.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;configurable.group.appearance&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
-      "PLAIN_TEXT"
+  &quot;keyToStringList&quot;: {
+    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
+      &quot;PLAIN_TEXT&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Progetti\Sophie\src\test\resources\programs" />
@@ -156,7 +155,8 @@
       <workItem from="1758460915122" duration="11297000" />
       <workItem from="1759587880308" duration="16317000" />
       <workItem from="1765903981933" duration="474000" />
-      <workItem from="1765904837736" duration="4378000" />
+      <workItem from="1765904837736" duration="4461000" />
+      <workItem from="1765981517069" duration="4392000" />
     </task>
     <task id="LOCAL-00001" summary="Test!">
       <option name="closed" value="true" />
@@ -166,7 +166,23 @@
       <option name="project" value="LOCAL" />
       <updated>1765905903672</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Prime modifiche">
+      <option name="closed" value="true" />
+      <created>1765909461571</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1765909461571</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Prime modifiche">
+      <option name="closed" value="true" />
+      <created>1765909495624</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1765909495624</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -174,7 +190,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Test!" />
-    <option name="LAST_COMMIT_MESSAGE" value="Test!" />
+    <MESSAGE value="Prime modifiche" />
+    <option name="LAST_COMMIT_MESSAGE" value="Prime modifiche" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

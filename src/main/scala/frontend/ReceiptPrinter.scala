@@ -36,10 +36,13 @@ object ReceiptPrinter {
     val pxW     = (rows.map(_._4.length) :+ "Prezzo".length).max
     val totW    = (rows.map(_._5.length) :+ "Totale".length).max
 
-    val header = f"%-${actionW}s  %- ${symW}s  %${qtyW}s  %${pxW}s  %${totW}s  %s".format("Azione","Simbolo","Quantità","Prezzo","Totale","Ora")
+    // Costruisce una stringa di formato dinamica corretta (senza spazi errati dopo '%-')
+    val lineFmt = s"%-${actionW}s  %-${symW}s  %${qtyW}s  %${pxW}s  %${totW}s  %s"
+
+    val header = lineFmt.format("Azione","Simbolo","Quantità","Prezzo","Totale","Ora")
 
     val bodyLines = rows.map { case (action, symbol, qty, price, total, when) =>
-      f"%-${actionW}s  %- ${symW}s  %${qtyW}s  %${pxW}s  %${totW}s  %s".format(action, symbol, qty, price, total, when)
+      lineFmt.format(action, symbol, qty, price, total, when)
     }
 
     // Print to stdout
