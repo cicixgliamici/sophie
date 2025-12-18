@@ -8,6 +8,9 @@ import ast._
 
 class ExecutorSpec extends AnyFunSuite {
   test("Executor.run with missing prices returns events for those instructions that can be resolved") {
+    // Executor should fail fast when encountering an instruction whose price
+    // cannot be resolved from explicit value or MarketData. Here only symbol B
+    // lacks a price, so the run is expected to raise with a clear message.
     val md = InMemoryMarketData(prices = Map("A" -> BigDecimal(10)), seriesData = Map.empty, indicatorOverrides = Map.empty)
     val tmpPf = Paths.get("tmp/test_pf_exec.json")
     val tmpLedger = Paths.get("tmp/test_ledger_exec.ndjson")
@@ -33,4 +36,3 @@ class ExecutorSpec extends AnyFunSuite {
     Files.deleteIfExists(tmpPf)
     Files.deleteIfExists(tmpLedger)
   }
-}
