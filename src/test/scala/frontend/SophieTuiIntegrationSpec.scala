@@ -2,7 +2,6 @@ package frontend
 
 import org.scalatest.funsuite.AnyFunSuite
 import engine.InMemoryMarketData
-import testhelpers.TestHelpers.DummyPrinter
 
 class SophieTuiIntegrationSpec extends AnyFunSuite {
 
@@ -12,10 +11,10 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
     val prog = "BUY 1500 EUR OF MSFT"
     val res = ProgramEvaluator.evaluate(prog, md)
     val plan = res.plan
-    val pm = new PortfolioManager(sym => md.price(sym), DummyPrinter)
-    val applied = pm.applyPlan(Some(plan), sym => md.price(sym))
+    val pm = new PortfolioManager()
+    val (afterState, applied, msgs) = pm.pureApplyPlan(Some(plan), sym => md.price(sym), pm.empty)
     assert(applied == 1)
-    val pf = pm.getPortfolio
+    val pf = afterState.positions
     assert(pf.contains("MSFT"), "Portfolio should contain MSFT after applying BUY")
     val actual = pf("MSFT")
     val expected = BigDecimal(1500) / BigDecimal(350)

@@ -13,6 +13,13 @@ object Executor {
     * - updates holdings and records a ledger event for every movement so we keep an
     *   auditable trail.
     * We return produced events so callers and tests can inspect or print them.
+    *
+    * Design notes:
+    *  - This component performs side-effects (reading/saving portfolio, appending ledger entries)
+    *    and therefore sits at the boundary of the pure core. The instructions and market-data
+    *    inputs remain pure values.
+    *  - Ledger and PortfolioStore are abstracted as traits so we can inject test doubles
+    *    during unit testing (see tests that use temporary files).
     */
   def run(instructions: List[Instruction], md: MarketData, pf: PortfolioStore, ledger: Ledger, source: String = "repl"): List[LedgerEvent] = {
     val pfState0 = pf.load().withDefaults

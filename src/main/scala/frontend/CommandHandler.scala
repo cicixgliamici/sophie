@@ -3,6 +3,23 @@ package frontend
 import SophieTui.{PasteBuffer, SessionState}
 import engine.PortfolioState
 
+/**
+  * CommandHandler
+  * ----------------
+  * Responsible for parsing textual TUI commands (lines starting with ':')
+  * and dispatching them to the `TuiActions` implementation. The handler keeps
+  * no state itself: it accepts the current `SessionState`, `PortfolioState`
+  * and `PasteBuffer` and returns a `CommandResult` which contains the
+  * potentially-updated values and log lines to display.
+  *
+  * Design notes:
+  *  - `TuiActions` is an interface used by the TUI implementation to provide
+  *    the concrete semantics (file I/O, market-data loading, compile/exec of IR).
+  *  - `CommandHandler` focuses solely on parsing command syntax and combining
+  *    action results with the TUI state; this keeps parsing logic separate
+  *    from the action implementations and simplifies testing.
+  */
+
 sealed trait TuiCommand
 object TuiCommand {
   case object Quit extends TuiCommand

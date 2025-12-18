@@ -80,6 +80,26 @@ public interface sophieListener extends ParseTreeListener {
 	 */
 	void exitValue(sophieParser.ValueContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link sophieParser#consideration}.
+	 * @param ctx the parse tree
+	 */
+	void enterConsideration(sophieParser.ConsiderationContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link sophieParser#consideration}.
+	 * @param ctx the parse tree
+	 */
+	void exitConsideration(sophieParser.ConsiderationContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link sophieParser#quantity}.
+	 * @param ctx the parse tree
+	 */
+	void enterQuantity(sophieParser.QuantityContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link sophieParser#quantity}.
+	 * @param ctx the parse tree
+	 */
+	void exitQuantity(sophieParser.QuantityContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link sophieParser#condition}.
 	 * @param ctx the parse tree
 	 */

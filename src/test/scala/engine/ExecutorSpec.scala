@@ -36,3 +36,4 @@ class ExecutorSpec extends AnyFunSuite {
     Files.deleteIfExists(tmpPf)
     Files.deleteIfExists(tmpLedger)
   }
+}

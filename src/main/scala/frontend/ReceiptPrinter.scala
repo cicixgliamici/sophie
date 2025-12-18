@@ -13,8 +13,15 @@ object ReceiptPrinter {
   private val fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME.withZone(ZoneId.systemDefault())
 
   /**
-    * Stampa una "ricevuta" leggibile per gli eventi eseguiti e opzionalmente la salva in file (append).
-    * Se `saveTo` è Some(path) scrive in append nel file specificato.
+    * Print human-friendly receipts for executed ledger events and optionally
+    * append them to a file.
+    *
+    * Notes:
+    *  - This component is intentionally IO-bound: printing and optionally
+    *    persisting receipts is a side-effect. The rest of the engine produces
+    *    the `LedgerEvent` list (pure), so we can test printing separately.
+    *  - The formatting code computes column widths dynamically to produce a
+    *    readable table regardless of the numeric widths.
     */
   def printReceipts(events: List[LedgerEvent], saveTo: Option[Path] = None): Unit = {
     if (events.isEmpty) return

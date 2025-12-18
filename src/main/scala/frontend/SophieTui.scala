@@ -9,6 +9,34 @@ import java.nio.file.{Files, Paths}
 import java.nio.charset.StandardCharsets.UTF_8
 import upickle.default.{read, write}
 
+/*
+  SophieTui
+  ---------
+  This object implements a small textual TUI (read-eval-print loop) used by
+  the project for interactive exploration and demos. Key design goals and
+  notes (useful for testing / university assignment):
+
+  - Separation of concerns: the TUI is thin and delegates the real work to
+    pure components (parser -> AST -> evaluator -> lowering). The core logic
+    that transforms program + market data -> execution plan is pure and
+    testable without I/O.
+
+  - Side-effects (I/O) are isolated: methods that perform file reads/writes
+    or print receipts are in `actions` or helper modules. This makes it easy
+    to test the program evaluation in isolation and to simulate user
+    interactions via `simulateSession`.
+
+  - Testing the TUI:
+    * Unit tests should exercise `SophieTui.simulateSession` to programmatically
+      feed commands and obtain the resulting (portfolio, lastPlan). This avoids
+      starting an interactive console during automated tests.
+    * For manual/testing of the interactive TUI: run the TUI main (TuiMain)
+      or call `SophieTui.run()` from the REPL / main runner.
+
+  Examples (how to test): see README.md at the project root for example
+  sbt commands to run the CLI and to run the TUI in interactive mode.
+*/
+
 object SophieTui {
 
   case class SessionState(
@@ -274,10 +302,20 @@ object SophieTui {
   }
 
   /**
-   * Simulate a TUI session programmatically.
-   * Returns the final portfolio and lastPlan for assertions in tests.
-   * This helper is intended for tests only.
-   */
+    * Simulate a TUI session programmatically.
+    *
+    * Purpose: provide a deterministic, non-interactive way to test TUI
+    * behaviour. The function accepts a sequence of input lines (commands and
+    * program lines) and returns the final portfolio positions and the last
+    * execution plan produced. Tests call this helper to assert behaviour.
+    *
+    * Example usage in tests:
+    *   val inputs = Seq(":set price MSFT 350", "BUY 100 EUR OF MSFT;", "", ":pf apply")
+    *   val (portfolio, lastPlan) = SophieTui.simulateSession(inputs)
+    *
+    * This keeps the interactive loop separate from automated tests (no
+    * System.in reads during unit tests).
+    */
   def simulateSession(inputs: Seq[String]): (Map[String, BigDecimal], Option[engine.ExecutionPlan]) = {
     @tailrec
     def process(rem: Seq[String], session: SessionState, portfolio: PortfolioState, buf: PasteBuffer): (SessionState, PortfolioState, PasteBuffer) =
@@ -305,5 +343,4 @@ object SophieTui {
 
     (finalPortfolio.positions, finalSession.lastPlan)
   }
-
 }

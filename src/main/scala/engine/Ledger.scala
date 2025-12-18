@@ -41,11 +41,31 @@ trait Ledger {
   def readAll(): Vector[LedgerEvent]
 }
 
+/**
+  * FileLedger
+  * ----------
+  * Default implementation of `Ledger` that persists events to a file as NDJSON.
+  * Each event is appended to the end of the file, and the file is created if it
+  * doesn't exist.
+  *
+  * @param path Path to the file where events will be stored.
+  */
 final case class FileLedger(path: Path) extends Ledger {
+  /**
+    * Append a new event to the ledger.
+    *
+    * @param e The event to append.
+    */
   override def append(e: LedgerEvent): Unit = {
     val line = write(e) + "\n" // NDJSON
     Files.writeString(path, line, UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
   }
+
+  /**
+    * Read all events from the ledger.
+    *
+    * @return A vector of all events in the ledger.
+    */
   override def readAll(): Vector[LedgerEvent] = {
     if (!Files.exists(path)) return Vector.empty
     import scala.jdk.CollectionConverters._

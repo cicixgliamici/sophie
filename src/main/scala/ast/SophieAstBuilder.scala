@@ -81,8 +81,35 @@ object SophieAstBuilder {
       else if (ctx.SELL() != null) Sell
       else throw new IllegalArgumentException("Missing BUY/SELL")
 
-    val v = fromValue(ctx.value())
+    // The grammar now wraps value/quantity into a `consideration` rule. Use that.
+    // Explanation (educational): the parser does not expose a single `value`
+    // token on the `trade_cmd` anymore — instead the grammar introduces a
+    // `consideration` non-terminal which can be either a `value` (NUMBER+CURRENCY)
+    // or a `quantity` (QTY NUMBER). This gives the language flexibility.
+    //
+    // We convert both shapes into the same AST representation (`Value`) so the
+    // downstream logic only needs to deal with a single concept: a numeric
+    // amount and a currency. When `quantity` is provided (QTY N), we treat the
+    // currency as the symbol being traded (so that PortfolioManager.computeQuantity
+    // can recognize it as a direct quantity and avoid market-data conversion).
+    //
+    // Functional vs Imperative note:
+    //  - Functional: we explicitly pattern-match on the parse tree and build
+    //    a pure AST node. No side effects, no mutable state. The transformation
+    //    is deterministic and easy to test: given the same parse tree we get the
+    //    same `TradeCmd` object.
+    //  - Imperative: one might parse tokens while mutating a shared structure or
+    //    using indexes into token arrays; error handling and branching tend to
+    //    interleave with parsing logic, making unit testing harder.
+    val cons = ctx.consideration()
     val sym = symbolText(ctx.symbol())
+    val v =
+      if (cons.value() != null) fromValue(cons.value())
+      else if (cons.quantity() != null) {
+        // Quantity is specified as `QTY <NUMBER>`; treat it as a Value with currency == symbol
+        val num = firstTokenOf(cons.quantity(), sophieParser.NUMBER)
+        Value(BigDecimal(num), sym)
+      } else throw new IllegalArgumentException("Missing consideration (value or quantity)")
 
     val cond =
       if (ctx.condition() != null) fromCondition(ctx.condition())

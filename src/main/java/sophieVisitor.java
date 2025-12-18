@@ -55,6 +55,18 @@ public interface sophieVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitValue(sophieParser.ValueContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link sophieParser#consideration}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitConsideration(sophieParser.ConsiderationContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link sophieParser#quantity}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitQuantity(sophieParser.QuantityContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link sophieParser#condition}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

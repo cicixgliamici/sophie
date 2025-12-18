@@ -28,14 +28,27 @@ class SophieTuiIrIntegrationSpec extends AnyFunSuite {
     val instrPath = Files.createTempFile("sophie_ir", ".json")
 
     try {
-      SophieTui.setPricePublic("MSFT", "50")
-      SophieTui.evalAndPrintPublic("""BUY 100 USD OF MSFT IF PRICE(MSFT) > 0;""")
+      // Build market data with PRICE(MSFT) = 50
+      val md = engine.InMemoryMarketData(prices = Map("MSFT" -> BigDecimal(50)), seriesData = Map.empty, indicatorOverrides = Map.empty)
 
-      SophieTui.compileIrPublic(instrPath.toString)
-      val compiled = Files.readString(instrPath, UTF_8)
-      assert(compiled.contains("MSFT"))
+      // Evaluate program to an execution plan
+      val prog = "BUY 100 USD OF MSFT IF PRICE(MSFT) > 0;"
+      val evalRes = ProgramEvaluator.evaluate(prog, md)
+      val plan = evalRes.plan
 
-      SophieTui.execIrPublic(instrPath.toString)
+      // Lower to IR instructions
+      val instrs = engine.Lowering.from(plan, md, source = "test") match {
+        case Left(err) => throw new AssertionError(s"Lowering failed: $err")
+        case Right(list) => list
+      }
+      assert(instrs.exists(_.symbol == "MSFT"))
+
+      // Execute the IR (simulate execIr)
+      // Ensure data directory exists (Executor/FileLedger expect it)
+      Files.createDirectories(dataDir)
+      val pfStore = FileJsonPortfolioStore(pfPath)
+      val ledger = FileLedger(ledgerPath)
+      val events = engine.Executor.run(instrs, md, pfStore, ledger, source = "test")
 
       val pfState = FileJsonPortfolioStore(pfPath).load()
       assert(pfState.positions("MSFT") == BigDecimal(2)) // 100 USD / 50 price -> 2 shares
