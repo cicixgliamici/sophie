@@ -18,6 +18,8 @@ class ExecutorPortfolioTest extends AnyFunSuite {
   }
 
   test("Executor BUY updates portfolio file and ledger") {
+    // Happy path: executing a BUY should persist the new position and append
+    // a ledger event so downstream tooling has a full audit trail.
     withTempFile { pfPath =>
       val pfStore = FileJsonPortfolioStore(pfPath)
       val ledgerPath = Files.createTempFile("sophie-ledger", ".ndjson")
@@ -45,6 +47,7 @@ class ExecutorPortfolioTest extends AnyFunSuite {
   }
 
   test("Executor SELL reduces but not below zero") {
+    // Selling more than current holdings should clamp to zero instead of going negative.
     withTempFile { pfPath =>
       val pfStore = FileJsonPortfolioStore(pfPath)
       // initialize portfolio with 2 BTC
@@ -66,6 +69,8 @@ class ExecutorPortfolioTest extends AnyFunSuite {
   }
 
   test("PortfolioJson roundtrip writes and reads expected JSON") {
+    // Verify the portfolio persistence format remains stable: positive positions
+    // survive a save/load cycle and the JSON contains expected keys for inspection.
     withTempFile { pfPath =>
       val pfStore = FileJsonPortfolioStore(pfPath)
       pfStore.save(PortfolioState(Map("AAPL" -> BigDecimal(10), "MSFT" -> BigDecimal(0)), cash = BigDecimal(1234)))
