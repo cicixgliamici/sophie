@@ -1,19 +1,21 @@
 package frontend
 
 import org.scalatest.funsuite.AnyFunSuite
+import engine.InMemoryMarketData
+import testhelpers.TestHelpers.DummyPrinter
 
 class SophieTuiIntegrationSpec extends AnyFunSuite {
 
   test("buy_apply_updates_portfolio") {
-    val inputs = Seq(
-      ":set price MSFT 350",
-      "BUY 1500 EUR OF MSFT;",
-      "", // blank line to submit program
-      ":pf apply"
-    )
-
-    val (pf, planOpt) = SophieTui.simulateSession(inputs)
-
+    // deterministic test: evaluate a program with a dedicated InMemoryMarketData and PortfolioManager
+    val md = InMemoryMarketData(prices = Map("MSFT" -> BigDecimal(350)), seriesData = Map.empty, indicatorOverrides = Map.empty)
+    val prog = "BUY 1500 EUR OF MSFT"
+    val res = ProgramEvaluator.evaluate(prog, md)
+    val plan = res.plan
+    val pm = new PortfolioManager(sym => md.price(sym), DummyPrinter)
+    val applied = pm.applyPlan(Some(plan), sym => md.price(sym))
+    assert(applied == 1)
+    val pf = pm.getPortfolio
     assert(pf.contains("MSFT"), "Portfolio should contain MSFT after applying BUY")
     val actual = pf("MSFT")
     val expected = BigDecimal(1500) / BigDecimal(350)

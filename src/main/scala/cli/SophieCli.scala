@@ -7,6 +7,7 @@ import upickle.default._
 
 import frontend.MdJsonCodec._
 import frontend.SophieParserFacade
+import frontend.PortfolioJson._
 import engine.{InMemoryMarketData, Lowering, Executor, FileLedger, FileJsonPortfolioStore}
 import engine._
 import frontend.ReceiptPrinter
@@ -67,22 +68,47 @@ object SophieCli {
 
       // 4) Optionally print instructions
       if (config.printInstructions) {
-        val inst = Lowering.from(plan, md, config.source)
-        println("\n=== Instructions (JSON) ===")
-        println(write(inst, indent = 2))
+        Lowering.from(plan, md, config.source) match {
+          case Left(err) =>
+            System.err.println(s"Error lowering to instructions: $err")
+          case Right(inst) =>
+            println("\n=== Instructions (JSON) ===")
+            println(write(inst, indent = 2))
+        }
       }
 
       // 5) Optionally execute
       if (config.execute) {
-        val inst = Lowering.from(plan, md, config.source)
-        val ledgerPath = config.ledgerPath.getOrElse(Paths.get("ledger.ndjson"))
-        val portfolioPath = config.portfolioPath.getOrElse(Paths.get("portfolio.json"))
-        val ledger = FileLedger(ledgerPath)
-        val pfStore = FileJsonPortfolioStore(portfolioPath)
-        val events = Executor.run(inst, md, pfStore, ledger, config.source)
-        println(s"Executed ${inst.length} instructions; ledger -> $ledgerPath, portfolio -> $portfolioPath")
-        val receiptPath = config.receiptFile.map(Paths.get(_))
-        ReceiptPrinter.printReceipts(events, receiptPath)
+        Lowering.from(plan, md, config.source) match {
+          case Left(err) =>
+            System.err.println(s"Error lowering to instructions: $err")
+            System.exit(1)
+          case Right(inst) =>
+            val ledgerPath = config.ledgerPath.getOrElse(Paths.get("ledger.ndjson"))
+            val portfolioPath = config.portfolioPath.getOrElse(Paths.get("portfolio.json"))
+
+            // If the portfolio file already exists, ask the user whether to reset it unless --reset-portfolio is provided
+            if (Files.exists(portfolioPath) && !config.resetPortfolio) {
+              Console.err.print(s"Portfolio file $portfolioPath esiste. Vuoi eliminarlo e iniziare da zero? [y/N]: ")
+              val ans = scala.io.StdIn.readLine().trim.toLowerCase
+              if (ans == "y" || ans == "yes") {
+                resetPortfolioFile(portfolioPath)
+                println(s"Portfolio $portfolioPath resettato.")
+              } else {
+                println(s"Mantengo il portfolio esistente: $portfolioPath")
+              }
+            } else if (Files.exists(portfolioPath) && config.resetPortfolio) {
+              resetPortfolioFile(portfolioPath)
+              println(s"Portfolio $portfolioPath resettato (--reset-portfolio).")
+            }
+
+            val ledger = FileLedger(ledgerPath)
+            val pfStore = FileJsonPortfolioStore(portfolioPath)
+            val events = Executor.run(inst, md, pfStore, ledger, config.source)
+            println(s"Executed ${inst.length} instructions; ledger -> $ledgerPath, portfolio -> $portfolioPath")
+            val receiptPath = config.receiptFile.map(Paths.get(_))
+            ReceiptPrinter.printReceipts(events, receiptPath)
+        }
       }
 
     } catch {
@@ -102,7 +128,8 @@ object SophieCli {
                              ledgerPath: Option[Path] = None,
                              portfolioPath: Option[Path] = None,
                              receiptFile: Option[String] = None,
-                             source: String = "cli"
+                             source: String = "cli",
+                             resetPortfolio: Boolean = false
                            )
 
   private def parseArgs(args: List[String]): Config = {
@@ -118,6 +145,7 @@ object SophieCli {
       case "--portfolio" :: p :: t => go(t, acc.copy(portfolioPath = Some(Paths.get(p))))
       case "--receipt-file" :: p :: t => go(t, acc.copy(receiptFile = Some(p)))
       case "--source" :: s :: t => go(t, acc.copy(source = s))
+      case "--reset-portfolio" :: t => go(t, acc.copy(resetPortfolio = true))
       case opt :: _ =>
         System.err.println(s"Unknown option or missing argument: $opt")
         acc.copy(showHelp = true)
@@ -135,6 +163,7 @@ object SophieCli {
     println("  --portfolio <path>        : portfolio file path (default: portfolio.json)")
     println("  --receipt-file <path>     : append textual receipt to this file (optional)")
     println("  --source <id>             : source id used to tag instructions (default: cli)")
+    println("  --reset-portfolio         : if portfolio file exists, reset it without asking")
     println("  --help, -h                : show this help")
   }
 
@@ -159,5 +188,13 @@ object SophieCli {
     }
   }
 
-}
+  // Reset portfolio file to an empty portfolio JSON format used by the project
+  private def resetPortfolioFile(p: Path): Unit = {
+    try {
+      val emptyPf = PortfolioJ(positions = Map.empty[String, BigDecimal], cash = Some(BigDecimal(0)))
+      val empty = upickle.default.write(emptyPf, indent = 2)
+      Files.writeString(p, empty)
+    } catch { case e: Exception => System.err.println(s"Error resetting portfolio file: ${e.getMessage}") }
+  }
 
+}

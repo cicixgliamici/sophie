@@ -49,9 +49,9 @@ class CommandHandler(priceLookup: String => Option[BigDecimal], portfolioManager
       case List(":pf", "show") =>
         portfolioManager.show(); true
       case List(":pf", "apply") =>
-        portfolioManager.applyPlan(SophieTui.getLastPlan(), priceFn); true
+        portfolioManager.applyPlan(SophieTui.getLastPlan, priceFn); true
       case List(":pf", "preview") =>
-        portfolioManager.previewPlan(SophieTui.getLastPlan(), priceFn); true
+        portfolioManager.previewPlan(SophieTui.getLastPlan, priceFn); true
       case List(":pf", "save", path) =>
         portfolioManager.save(path); true
       case List(":pf", "load", path) =>

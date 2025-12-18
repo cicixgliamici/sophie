@@ -3,11 +3,9 @@ package frontend
 import java.nio.file.{Files, Paths}
 import java.nio.charset.StandardCharsets.UTF_8
 import upickle.default.{read, write}
-import frontend.PortfolioJson
 import scala.util.control.NonFatal
 import scala.math.BigDecimal.RoundingMode
 import engine._
-import ast._
 
 class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinter) {
   // Manages the portfolio state used by the TUI and encapsulates all
@@ -66,92 +64,98 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
     } catch { case NonFatal(e) => printer.printlnLine(s"Error loading portfolio: ${e.getMessage}") }
   }
 
-  // apply an optional plan; returns number of applied trades
-  def applyPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal]): Int = {
+  // Pure transition: apply an optional plan to a given PortfolioState and return the new state,
+  // number of applied trades and a list of messages to display. This is pure and does not use printer.
+  def pureApplyPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, List[String]) = {
     planOpt match {
-      case None => printer.printlnLine("No plan to apply. Evaluate a program first."); 0
+      case None => (state, 0, List("No plan to apply. Evaluate a program first."))
       case Some(plan) =>
         val exec = plan.trades.filter(_.shouldExecute)
-        if (exec.isEmpty) { printer.printlnLine("No EXECUTE trades in last plan."); 0 }
+        if (exec.isEmpty) (state, 0, List("No EXECUTE trades in last plan."))
         else {
-          var applied = 0
-          exec.foreach { d =>
-            val sym = d.cmd.symbol
-            val v   = d.cmd.value
-            val qty: BigDecimal =
-              if (v.currency == sym) v.amount
-              else mdPriceFn(sym) match {
-                case Some(px) if px != 0 => v.amount / px
-                case _ =>
-                  printer.printlnLine(s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
-                  BigDecimal(0)
-              }
-            if (qty > 0) {
-              val cur = positions(sym)
-              val next = d.cmd.action match {
-                case ast.Buy  => cur + qty
-                case ast.Sell => (cur - qty).max(BigDecimal(0))
-              }
-              if (next != cur) {
-                if (d.cmd.action == ast.Sell && cur == 0) {
-                  printer.printlnLine(s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
-                } else {
-                  portfolio = portfolio.copy(positions = portfolio.positions.updated(sym, next))
-                  applied += 1
+          val (finalState, applied, msgs) = exec.foldLeft((state, 0, List.empty[String])) {
+            case ((st, appl, msgs), d) =>
+              val sym = d.cmd.symbol
+              val v   = d.cmd.value
+              val (qty, msgs2) =
+                if (v.currency == sym) (v.amount, msgs)
+                else mdPriceFn(sym) match {
+                  case Some(px) if px != 0 => (v.amount / px, msgs)
+                  case Some(_)             => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
+                  case None                => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
                 }
-              } else {
-                printer.printlnLine(s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
-              }
-            } else {
-              printer.printlnLine(s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
-            }
+
+              if (qty > 0) {
+                val cur = st.positions.withDefaultValue(BigDecimal(0))(sym)
+                val next = d.cmd.action match { case ast.Buy => cur + qty; case ast.Sell => (cur - qty).max(BigDecimal(0)) }
+                if (next != cur) {
+                  if (d.cmd.action == ast.Sell && cur == 0) (st, appl, msgs2 :+ s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
+                  else (st.copy(positions = st.positions.updated(sym, next)), appl + 1, msgs2)
+                } else (st, appl, msgs2 :+ s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
+              } else (st, appl, msgs2 :+ s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
           }
-          portfolio = portfolio.copy(positions = portfolio.positions.filter { case (_, q) => q > 0 })
-          printer.printlnLine(s"Applied $applied trade(s) to portfolio.")
-          show()
-          applied
+
+          val finalFiltered = finalState.copy(positions = finalState.positions.filter { case (_, q) => q > 0 })
+          (finalFiltered, applied, msgs :+ s"Applied $applied trade(s) to portfolio.")
         }
     }
   }
 
-  // preview without mutating internal portfolio
-  def previewPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal]): Map[String, BigDecimal] = {
+  // Pure preview: returns the resulting PortfolioState, applied count and messages, without side-effects
+  def purePreviewPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, List[String]) = {
     planOpt match {
-      case None => printer.printlnLine("No plan to preview. Evaluate a program first."); Map.empty
+      case None => (state, 0, List("No plan to preview. Evaluate a program first."))
       case Some(plan) =>
         val exec = plan.trades.filter(_.shouldExecute)
-        if (exec.isEmpty) { printer.printlnLine("No EXECUTE trades in last plan."); Map.empty }
+        if (exec.isEmpty) (state, 0, List("No EXECUTE trades in last plan."))
         else {
-          var applied = 0
-          var tmp = portfolio
-          exec.foreach { d =>
-            val sym = d.cmd.symbol
-            val v   = d.cmd.value
-            val qty: BigDecimal =
-              if (v.currency == sym) v.amount
-              else mdPriceFn(sym) match {
-                case Some(px) if px != 0 => v.amount / px
-                case _ =>
-                  printer.printlnLine(s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
-                  BigDecimal(0)
-              }
-            if (qty > 0) {
-              val cur = tmp.positions.withDefaultValue(BigDecimal(0))(sym)
-              val next = d.cmd.action match {
-                case ast.Buy  => cur + qty
-                case ast.Sell => (cur - qty).max(BigDecimal(0))
-              }
-              if (next != cur) {
-                if (d.cmd.action == ast.Sell && cur == 0) printer.printlnLine(s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
-                else { tmp = tmp.copy(positions = tmp.positions.updated(sym, next)); applied += 1 }
-              } else printer.printlnLine(s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
-            } else printer.printlnLine(s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
+          val (finalState, applied, msgs) = exec.foldLeft((state, 0, List.empty[String])) {
+            case ((st, appl, msgs), d) =>
+              val sym = d.cmd.symbol
+              val v   = d.cmd.value
+              val (qty, msgs2) =
+                if (v.currency == sym) (v.amount, msgs)
+                else mdPriceFn(sym) match {
+                  case Some(px) if px != 0 => (v.amount / px, msgs)
+                  case Some(_)             => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
+                  case None                => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
+                }
+
+              if (qty > 0) {
+                val cur = st.positions.withDefaultValue(BigDecimal(0))(sym)
+                val next = d.cmd.action match { case ast.Buy => cur + qty; case ast.Sell => (cur - qty).max(BigDecimal(0)) }
+                if (next != cur) {
+                  if (d.cmd.action == ast.Sell && cur == 0) (st, appl, msgs2 :+ s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
+                  else (st.copy(positions = st.positions.updated(sym, next)), appl + 1, msgs2)
+                } else (st, appl, msgs2 :+ s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
+              } else (st, appl, msgs2 :+ s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
           }
-          printer.printlnLine(s"Preview: would apply $applied trade(s). Resulting portfolio:")
-          if (tmp.positions.isEmpty) printer.printlnLine(" - (empty)")
-          else tmp.positions.toSeq.sortBy(_._1).foreach { case (s,q) => printer.printlnLine(s" - $s: qty=${fmt(q)}") }
-          tmp
+
+          val finalFiltered = finalState.copy(positions = finalState.positions.filter { case (_, q) => q > 0 })
+          (finalFiltered, applied, msgs :+ s"Preview: would apply $applied trade(s).")
         }
     }
+  }
+
+  // apply an optional plan; returns number of applied trades
+  def applyPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal]): Int = {
+    val (newState, applied, msgs) = pureApplyPlan(planOpt, mdPriceFn, portfolio)
+    msgs.foreach(printer.printlnLine)
+    portfolio = newState
+    // show resulting portfolio similar to previous behavior
+    if (applied > 0) show()
+    applied
+  }
+
+  // preview without mutating internal portfolio
+  def previewPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal]): Map[String, BigDecimal] = {
+    val (newState, applied, msgs) = purePreviewPlan(planOpt, mdPriceFn, portfolio)
+    msgs.foreach(printer.printlnLine)
+    if (applied > 0) {
+      printer.printlnLine("Resulting portfolio:")
+      if (newState.positions.isEmpty) printer.printlnLine(" - (empty)")
+      else newState.positions.toSeq.sortBy(_._1).foreach { case (s,q) => printer.printlnLine(s" - $s: qty=${fmt(q)}") }
+    }
+    newState.positions
   }
 }

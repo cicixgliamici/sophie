@@ -41,21 +41,37 @@ object Instruction {
 }
 
 object Lowering {
-  /** Convert an ExecutionPlan into concrete Instructions (filters EXECUTE only). */
-  def from(plan: ExecutionPlan, md: MarketData, source: String = "repl"): List[Instruction] = {
+  /** Convert an ExecutionPlan into concrete Instructions (filters EXECUTE only).
+    * Returns an Either: Left(errorMessage) if lowering failed, or Right(listOfInstructions) on success.
+    */
+  def from(plan: ExecutionPlan, md: MarketData, source: String = "repl"): Either[String, List[Instruction]] = {
     val exec = plan.trades.filter(_.shouldExecute)
-    exec.zipWithIndex.map { case (dec, idx) =>
+
+    // Helper: convert a single decision to Either[String, Instruction]
+    def toInstr(decIdx: (TradeDecision, Int)): Either[String, Instruction] = {
+      val (dec, idx) = decIdx
       val cmd = dec.cmd
-      val qty =
-        if (cmd.value.currency == cmd.symbol) cmd.value.amount
-        else {
-          val px = md.price(cmd.symbol)
-            .getOrElse(throw new IllegalStateException(s"Missing PRICE(${cmd.symbol}) to convert ${cmd.value.amount} ${cmd.value.currency} to qty"))
-          if (px == 0) throw new IllegalStateException(s"PRICE(${cmd.symbol}) is zero")
-          (cmd.value.amount / px)
+      val qtyE: Either[String, BigDecimal] =
+        if (cmd.value.currency == cmd.symbol) Right(cmd.value.amount)
+        else md.price(cmd.symbol) match {
+          case Some(px) if px != 0 => Right(cmd.value.amount / px)
+          case Some(_)             => Left(s"PRICE(${cmd.symbol}) is zero")
+          case None                => Left(s"Missing PRICE(${cmd.symbol}) to convert ${cmd.value.amount} ${cmd.value.currency} to qty")
         }
-      val id = s"$source-$idx-${System.nanoTime()}"
-      Instruction(id, cmd.action, cmd.symbol, qty, price = None, note = dec.detail)
+
+      qtyE.map { qty =>
+        val id = s"$source-$idx-${System.nanoTime()}"
+        Instruction(id, cmd.action, cmd.symbol, qty, price = None, note = dec.detail)
+      }
+    }
+
+    // Traverse exec with indexes, short-circuiting on the first Left
+    val indexed = exec.zipWithIndex
+    indexed.foldRight(Right(Nil): Either[String, List[Instruction]]) { case (pair, accE) =>
+      for {
+        acc <- accE
+        instr <- toInstr(pair)
+      } yield instr :: acc
     }
   }
 }

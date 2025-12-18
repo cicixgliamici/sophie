@@ -15,47 +15,43 @@ object Executor {
     * We return produced events so callers and tests can inspect or print them.
     */
   def run(instructions: List[Instruction], md: MarketData, pf: PortfolioStore, ledger: Ledger, source: String = "repl"): List[LedgerEvent] = {
-    var pfState = pf.load().withDefaults
-    var portfolio = pfState.positions
-    var produced = List.empty[LedgerEvent]
+    val pfState0 = pf.load().withDefaults
 
+    // Fold over instructions producing (portfolio, producedEvents)
+    val (finalPortfolio, producedRev) = instructions.foldLeft((pfState0.positions, List.empty[LedgerEvent])) {
+      case ((portfolio, acc), instr) =>
+        val px = instr.price.orElse(md.price(instr.symbol))
+          .getOrElse(throw new IllegalStateException(s"Missing PRICE(${instr.symbol}) to execute instruction ${instr.id}"))
 
-    // Priority: if the instruction carries an explicit price we use it;
-    // otherwise we look at current MarketData. Missing prices are fatal
-    // because we would not be able to value the trade.
-    instructions.foreach { instr =>
-      val px = instr.price.orElse(md.price(instr.symbol))
-        .getOrElse(throw new IllegalStateException(s"Missing PRICE(${instr.symbol}) to execute instruction ${instr.id}"))
+        val notional = instr.qty * px
+        val cur = portfolio(instr.symbol)
 
-      val notional = instr.qty * px
-      val cur = portfolio(instr.symbol)
+        val next = instr.action match {
+          case Buy  => cur + instr.qty
+          case Sell => (cur - instr.qty).max(BigDecimal(0))
+        }
+        val updatedPortfolio = portfolio.updated(instr.symbol, next)
 
-      // Executor works with quantities, not cash: BUY increases the position,
-      // SELL reduces it down to zero to avoid negative inventory (simplified
-      // model for the project).
-      val next = instr.action match {
-        case Buy  => cur + instr.qty
-        case Sell => (cur - instr.qty).max(BigDecimal(0))
-      }
-      portfolio = portfolio.updated(instr.symbol, next)
+        val event = LedgerEvent(
+          ts = java.time.Instant.now().toEpochMilli,
+          action = instr.action,
+          symbol = instr.symbol,
+          qty = instr.qty,
+          price = px,
+          notional = notional,
+          source = source,
+          note = instr.note
+        )
 
-      val event = LedgerEvent(
-        ts = java.time.Instant.now().toEpochMilli,
-        action = instr.action,
-        symbol = instr.symbol,
-        qty = instr.qty,
-        price = px,
-        notional = notional,
-        source = source,
-        note = instr.note
-      )
-      ledger.append(event)
-      produced ::= event
+        // Keep appending to ledger as a side-effect (edge of the system)
+        ledger.append(event)
+
+        (updatedPortfolio, event :: acc)
     }
 
     // Persist only positive positions to keep the file tidy.
-    pfState = pfState.copy(positions = portfolio).onlyPositivePositions
+    val pfState = pfState0.copy(positions = finalPortfolio).onlyPositivePositions
     pf.save(pfState)
-    produced.reverse
+    producedRev.reverse
   }
 }

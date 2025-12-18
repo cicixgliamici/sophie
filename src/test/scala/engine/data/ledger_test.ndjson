@@ -1,0 +1,2 @@
+{"ts":1766059070123,"action":"SELL","symbol":"AAPL","qty":"6.25","price":"160.0","notional":"1000.000","source":"cli","note":"SELL 1000 USD OF AAPL - condition met"}
+{"ts":1766059070139,"action":"BUY","symbol":"MSFT","qty":"3.125","price":"320.0","notional":"1000.0000","source":"cli","note":"BUY 1000 EUR OF MSFT - condition met"}

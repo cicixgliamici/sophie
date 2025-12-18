@@ -1,0 +1,18 @@
+{
+  "prices": {
+    "AAPL": 160,
+    "MSFT": 320,
+    "VWCE": 100,
+    "BTC": 62000
+  },
+  "series": {
+    "BTC.volume": [500000, 800000, 2000000]
+  },
+  "indicatorOverrides": [
+    { "name": "RSI", "symbol": "AAPL", "period": 14, "value": 75 },
+    { "name": "RSI", "symbol": "MSFT", "period": 14, "value": 35 },
+    { "name": "MAVG", "symbol": "MSFT", "period": 20, "value": 330 },
+    { "name": "MAVG", "symbol": "MSFT", "period": 50, "value": 320 }
+  ]
+}
+

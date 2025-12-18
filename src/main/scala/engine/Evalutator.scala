@@ -150,15 +150,15 @@ object Indicators {
     if (xs.isEmpty) BigDecimal(0) else xs.sum / BigDecimal(xs.length)
 
   /** Simple Moving Average over last n closes. */
-  def sma(closes: Vector[BigDecimal], n: Int): BigDecimal =
+  private def sma(closes: Vector[BigDecimal], n: Int): BigDecimal =
     mean(tailN(closes, n))
 
   /**
     * Exponential Moving Average (K = 2/(n+1)). Seeded with SMA of first n.
     * Uses a standard EMA formula, starting with the SMA as the initial value.
     */
-  def ema(closes: Vector[BigDecimal], n: Int): BigDecimal = {
-    if (closes.length < n) throw new IllegalArgumentException(s"Need $n points, got ${closes.length}")
+  private def ema(closes: Vector[BigDecimal], n: Int): BigDecimal = {
+    if (closes.length < n) throw new IllegalArgumentException(s"Need $n points, got ${closes.length}" )
     val alpha = 2.0 / (n + 1)
     val seed  = sma(closes.take(n), n).toDouble
     val emaSeq = closes.drop(n).foldLeft(seed) { (prev, price) =>
@@ -171,7 +171,7 @@ object Indicators {
     * Population standard deviation of last n closes.
     * Uses the population formula (not sample).
     */
-  def stddev(closes: Vector[BigDecimal], n: Int): BigDecimal = {
+  private def stddev(closes: Vector[BigDecimal], n: Int): BigDecimal = {
     val xs  = tailN(closes, n)
     val mu  = mean(xs)
     val varPop = xs.map(x => (x - mu) * (x - mu)).sum / BigDecimal(xs.length)
@@ -214,11 +214,12 @@ object Indicators {
     * Poor man's sqrt for BigDecimal — good enough for risk metrics (10 iterations).
     * Uses Newton's method for square root approximation.
     */
-  private def sqrtBD(x: BigDecimal, scale: Int = 10): BigDecimal = {
-    if (x <= 0) return BigDecimal(0)
-    var guess = BigDecimal(Math.sqrt(x.toDouble))
-    val two = BigDecimal(2)
-    for (_ <- 0 until 10) guess = (guess + x / guess) / two
-    guess.setScale(scale, RoundingMode.HALF_UP)
-  }
+  private def sqrtBD(x: BigDecimal, scale: Int = 10): BigDecimal =
+    if (x <= 0) BigDecimal(0)
+    else {
+      val two = BigDecimal(2)
+      val initial = BigDecimal(Math.sqrt(x.toDouble))
+      val approx = Iterator.iterate(initial)(g => (g + x / g) / two).drop(10).next()
+      approx.setScale(scale, RoundingMode.HALF_UP)
+    }
 }

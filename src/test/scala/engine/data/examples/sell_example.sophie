@@ -1,0 +1,4 @@
+SELL 0.5 BTC OF BTC IF
+  BTC.volume > 1000000
+  && STDDEV(BTC, 20) > PRICE(BTC);
+

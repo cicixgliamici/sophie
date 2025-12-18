@@ -4,29 +4,38 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="Fat Jar">
-      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/CommandHandler.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/PortfolioManager.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/ProgramEvaluator.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/frontend/TuiPrinter.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/ExecutorPortfolioTest.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiIntegrationSpec.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiSpec.scala" afterDir="false" />
+    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="TUI funzionante">
+      <change afterPath="$PROJECT_DIR$/docs/storage_and_persistence.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/MainSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/ExecutorSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/IRLoweringSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/IndicatorsSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/InstructionJsonSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/LedgerSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/data/examples/buy_example.sophie" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/data/examples/portfolio_example.sophie" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/data/examples/sell_example.sophie" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/data/examples/strategy_example.sophie" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/engine/data/md_for_strategy.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/CommandHandlerSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/EndToEndTradingSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/PortfolioManagerPureSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiSimSpec.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/testhelpers/TestHelpers.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/quick_test_fixed.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/run-fat.bat" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/run-fat.ps1" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/antlr4/sophie.g4" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/antlr4/sophie.g4" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/sophie.interp" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/sophie.interp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/sophieParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/sophieParser.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/ast/AST.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/ast/AST.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/ast/SophieAstBuilder.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/ast/SophieAstBuilder.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ledger.ndjson" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/engine/data/ledger.ndjson" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/portfolio.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/engine/data/portfolio.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/project/plugins.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/project/plugins.sbt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/cli/SophieCli.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/cli/SophieCli.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/engine/Evalutator.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/Evalutator.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/Executor.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/Executor.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/IR.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/IR.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/CommandHandler.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/CommandHandler.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/PortfolioManager.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/PortfolioManager.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/SophieTui.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/SophieTui.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/scala/ast/SophieAstBuilderTest.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/ast/SophieAstBuilderTest.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/scala/parser/SyntaxErrorTest.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/parser/SyntaxErrorTest.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tmp/md_out.json" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/md_out.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tui_commands.txt" beforeDir="false" afterPath="$PROJECT_DIR$/tui_commands.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiIntegrationSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiIntegrationSpec.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tmp/test_pf_rt.json" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/test_pf_rt.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tui_commands.txt" beforeDir="false" afterPath="$PROJECT_DIR$/docs/tui_commands.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -120,6 +129,9 @@
 }</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Progetti\Sophie\src\test\scala\frontend" />
+      <recent name="C:\Progetti\Sophie\src\test\scala\engine" />
+      <recent name="C:\Progetti\Sophie\docs" />
       <recent name="C:\Progetti\Sophie\src\test\resources\programs" />
     </key>
   </component>
@@ -171,7 +183,8 @@
       <workItem from="1759587880308" duration="16317000" />
       <workItem from="1765903981933" duration="474000" />
       <workItem from="1765904837736" duration="4461000" />
-      <workItem from="1765981517069" duration="10833000" />
+      <workItem from="1765981517069" duration="10895000" />
+      <workItem from="1766057199074" duration="9382000" />
     </task>
     <task id="LOCAL-00001" summary="Test!">
       <option name="closed" value="true" />
@@ -205,7 +218,15 @@
       <option name="project" value="LOCAL" />
       <updated>1765986005860</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="TUI funzionante">
+      <option name="closed" value="true" />
+      <created>1765992554610</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1765992554610</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -215,7 +236,8 @@
     <MESSAGE value="Test!" />
     <MESSAGE value="Prime modifiche" />
     <MESSAGE value="Fat Jar" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fat Jar" />
+    <MESSAGE value="TUI funzionante" />
+    <option name="LAST_COMMIT_MESSAGE" value="TUI funzionante" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

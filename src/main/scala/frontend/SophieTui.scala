@@ -7,9 +7,6 @@ import scala.util.control.NonFatal
 import java.nio.file.{Files, Paths}
 import java.nio.charset.StandardCharsets.UTF_8
 import upickle.default.{read, write}
-import frontend.MdJsonCodec
-import frontend.PortfolioJson
-import frontend.ReceiptPrinter
 import scala.math.BigDecimal.RoundingMode
 
 object SophieTui {
@@ -66,7 +63,7 @@ object SophieTui {
     println("Bye.")
   }
 
-  // -------- Commands --------
+  // -------- Command handling --------
   private def handleCommand(cmd: String, buf: StringBuilder): Boolean = {
     // delegate to CommandHandler to keep SophieTui thin
     commandHandler.handle(cmd, buf)
@@ -218,19 +215,20 @@ object SophieTui {
   private def pfShow(): Unit = {
     println("\n=== Portfolio ===")
     if (portfolio.isEmpty) println(" - (empty)")
-    var total: BigDecimal = 0
-    portfolio.toSeq.sortBy(_._1).foreach { case (sym, qty) =>
-      val line = md.price(sym) match {
-        case Some(px) =>
-          val v = qty * px; total += v
-          s"$sym: qty=${fmtQty(qty)}  ~ value=${fmt(v)} (px=${fmt(px)})"
-        case None =>
-          s"$sym: qty=${fmtQty(qty)}  (no price)"
+    else {
+      val rows = portfolio.toSeq.sortBy(_._1).map { case (sym, qty) =>
+        md.price(sym) match {
+          case Some(px) =>
+            val v = qty * px
+            (s" - $sym: qty=${fmtQty(qty)}  ~ value=${fmt(v)} (px=${fmt(px)})", v)
+          case None => (s" - $sym: qty=${fmtQty(qty)}  (no price)", BigDecimal(0))
+        }
       }
-      println(" - " + line)
+      rows.foreach { case (line, _) => println(line) }
+      val total = rows.map(_._2).sum
+      if (total > 0) println(s"Total M2M value ~ ${fmt(total)}")
+      println()
     }
-    if (total > 0) println(s"Total M2M value ~ ${fmt(total)}")
-    println()
   }
 
   private def pfApply(): Unit = {
@@ -239,43 +237,48 @@ object SophieTui {
         println("No plan to apply. Evaluate a program first.")
       case Some(plan) =>
         val exec = plan.trades.filter(_.shouldExecute)
-        if (exec.isEmpty) { println("No EXECUTE trades in last plan."); return }
-        var applied = 0
-        exec.foreach { d =>
-          val sym = d.cmd.symbol
-          val v   = d.cmd.value
-          val qty: BigDecimal =
-            if (v.currency == sym) v.amount
-            else md.price(sym) match {
-              case Some(px) if px != 0 => v.amount / px
-              case _ =>
-                println(s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
-                BigDecimal(0)
-            }
-          if (qty > 0) {
-            val cur = portfolio(sym)
-            val next = d.cmd.action match {
-              case Buy  => cur + qty
-              case Sell => (cur - qty).max(BigDecimal(0))
-            }
-            if (next != cur) {
-              // Only update and count as applied if portfolio actually changes
-              if (d.cmd.action == Sell && cur == 0) {
-                println(s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
+        if (exec.isEmpty) {
+          println("No EXECUTE trades in last plan.")
+        } else {
+          val (updatedPortfolio, applied) = exec.foldLeft((portfolio, 0)) {
+            case ((pfMap, applied), d) =>
+              val sym = d.cmd.symbol
+              val v   = d.cmd.value
+              val qty: BigDecimal =
+                if (v.currency == sym) v.amount
+                else md.price(sym) match {
+                  case Some(px) if px != 0 => v.amount / px
+                  case _ =>
+                    println(s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
+                    BigDecimal(0)
+                }
+
+              if (qty > 0) {
+                val cur = pfMap(sym)
+                val next = d.cmd.action match {
+                  case Buy  => cur + qty
+                  case Sell => (cur - qty).max(BigDecimal(0))
+                }
+                if (next != cur) {
+                  if (d.cmd.action == Sell && cur == 0) {
+                    println(s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
+                    (pfMap, applied)
+                  } else {
+                    (pfMap.updated(sym, next), applied + 1)
+                  }
+                } else {
+                  println(s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
+                  (pfMap, applied)
+                }
               } else {
-                portfolio = portfolio.updated(sym, next)
-                applied += 1
+                println(s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
+                (pfMap, applied)
               }
-            } else {
-              println(s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
-            }
-          } else {
-            println(s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
           }
+          portfolio = updatedPortfolio.filter { case (_, q) => q > 0 }
+          println(s"Applied $applied trade(s) to portfolio.")
+          pfShow()
         }
-        portfolio = portfolio.filter { case (_, q) => q > 0 }
-        println(s"Applied $applied trade(s) to portfolio.")
-        pfShow()
     }
   }
 
@@ -285,43 +288,49 @@ object SophieTui {
       case None => println("No plan to preview. Evaluate a program first.")
       case Some(plan) =>
         val exec = plan.trades.filter(_.shouldExecute)
-        if (exec.isEmpty) { println("No EXECUTE trades in last plan."); return }
-        var applied = 0
-        var tmp = portfolio
-        exec.foreach { d =>
-          val sym = d.cmd.symbol
-          val v   = d.cmd.value
-          val qty: BigDecimal =
-            if (v.currency == sym) v.amount
-            else md.price(sym) match {
-              case Some(px) if px != 0 => v.amount / px
-              case _ =>
-                println(s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
-                BigDecimal(0)
-            }
-          if (qty > 0) {
-            val cur = tmp.withDefaultValue(BigDecimal(0))(sym)
-            val next = d.cmd.action match {
-              case Buy  => cur + qty
-              case Sell => (cur - qty).max(BigDecimal(0))
-            }
-            if (next != cur) {
-              if (d.cmd.action == Sell && cur == 0) {
-                println(s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
+        if (exec.isEmpty) {
+          println("No EXECUTE trades in last plan.")
+        } else {
+          val (tmp, applied) = exec.foldLeft((portfolio, 0)) {
+            case ((tmpMap, applied), d) =>
+              val sym = d.cmd.symbol
+              val v   = d.cmd.value
+              val qty: BigDecimal =
+                if (v.currency == sym) v.amount
+                else md.price(sym) match {
+                  case Some(px) if px != 0 => v.amount / px
+                  case _ =>
+                    println(s" ! Missing PRICE($sym) - cannot convert ${fmt(v.amount)} ${v.currency} to quantity")
+                    BigDecimal(0)
+                }
+
+              if (qty > 0) {
+                val cur = tmpMap.withDefaultValue(BigDecimal(0))(sym)
+                val next = d.cmd.action match {
+                  case Buy  => cur + qty
+                  case Sell => (cur - qty).max(BigDecimal(0))
+                }
+                if (next != cur) {
+                  if (d.cmd.action == Sell && cur == 0) {
+                    println(s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
+                    (tmpMap, applied)
+                  } else {
+                    (tmpMap.updated(sym, next), applied + 1)
+                  }
+                } else {
+                  println(s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
+                  (tmpMap, applied)
+                }
               } else {
-                tmp = tmp.updated(sym, next)
-                applied += 1
+                println(s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
+                (tmpMap, applied)
               }
-            } else {
-              println(s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
-            }
-          } else {
-            println(s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
           }
+
+          println(s"Preview: would apply $applied trade(s). Resulting portfolio:")
+          if (tmp.isEmpty) println(" - (empty)")
+          else tmp.toSeq.sortBy(_._1).foreach { case (s,q) => println(s" - $s: qty=${fmt(q)}") }
         }
-        println(s"Preview: would apply $applied trade(s). Resulting portfolio:")
-        if (tmp.isEmpty) println(" - (empty)")
-        else tmp.toSeq.sortBy(_._1).foreach { case (s,q) => println(s" - $s: qty=${fmt(q)}") }
     }
   }
 
@@ -370,10 +379,14 @@ object SophieTui {
       case Some(plan) =>
         try {
           ensureParentDir(path)
-          val instrs = Lowering.from(plan, md, source = "tui")
-          val json = write(instrs, indent = 2)
-          Files.writeString(Paths.get(path), json, UTF_8)
-          println(s"Wrote IR instructions to $path (${instrs.size} op)")
+
+          Lowering.from(plan, md, source = "tui") match {
+            case Left(err) => println(s"Error lowering to instructions: $err")
+            case Right(instrs) =>
+              val json = write(instrs, indent = 2)
+              Files.writeString(Paths.get(path), json, UTF_8)
+              println(s"Wrote IR instructions to $path (${instrs.size} op)")
+          }
         } catch { case e: Exception => println(s"Error: ${e.getMessage}") }
     }
   }
@@ -438,7 +451,7 @@ object SophieTui {
   def runProgPublic(path: String): Unit = runProg(path)
   def saveProgPublic(path: String): Unit = saveProg(path)
 
-  def getLastPlan(): Option[ExecutionPlan] = lastPlan
+  def getLastPlan: Option[ExecutionPlan] = lastPlan
   def compileIrPublic(path: String): Unit = compileIr(path)
   def execIrPublic(path: String): Unit = execIr(path)
   def evalAndPrintPublic(src: String): Unit = evalAndPrint(src)
@@ -449,8 +462,8 @@ object SophieTui {
    * This helper is intended for tests only.
    */
   def simulateSession(inputs: Seq[String]): (Map[String, BigDecimal], Option[engine.ExecutionPlan]) = {
-    // reset transient state to have a clean session
-    // Portfolio state is now managed by portfolioManager
+    // reset transient state to have a clean session (isolate MD and portfolio)
+    md = InMemoryMarketData()
     portfolioManager.reset()
     lastPlan = None
     lastProgramSrc = None
@@ -462,32 +475,41 @@ object SophieTui {
       else line.replace("\uFEFF", "").replaceAll("\\p{C}", "").trim
     }
 
-    var stopped = false
-    for (raw <- inputs if !stopped) {
+    // detect if inputs contain a termination (null) and process only until then
+    val hasStop = inputs.exists(raw => normalize(raw) == null)
+    val toProcess = if (hasStop) inputs.takeWhile(raw => normalize(raw) != null) else inputs
+
+    // process inputs functionally
+    toProcess.foreach { raw =>
       val line = normalize(raw)
-      if (line == null) stopped = true
+      // DEBUG LOGS
+      println(s"[simulateSession] raw='$raw' normalized='${line}' bufBefore='${buf.result()}'")
+      if (line == null) ()
       else if (line.isEmpty && buf.nonEmpty) {
         val programSrc = buf.result(); buf.clear()
+        println(s"[simulateSession] EVALUATE program:\n$programSrc")
         // use existing evalAndPrint which sets lastPlan/lastProgramSrc
         evalAndPrint(programSrc)
       } else if (line.startsWith(":")) {
+        println(s"[simulateSession] HANDLE COMMAND: $line")
         // treat as command even during paste-mode
         handleCommand(line, buf)
       } else {
         buf.append(raw).append('\n')
+        println(s"[simulateSession] APPENDED to buffer, now='${buf.result()}'")
       }
     }
 
-    if (stopped) return (portfolioManager.getPortfolio, lastPlan)
+    if (hasStop) (portfolioManager.getPortfolio, lastPlan)
+    else {
+      // If inputs ended but buffer still has program, evaluate it (mimic user pressing blank line at end)
+      if (buf.nonEmpty) {
+        val programSrc = buf.result(); buf.clear()
+        evalAndPrint(programSrc)
+      }
 
-    // If inputs ended but buffer still has program, evaluate it (mimic user pressing blank line at end)
-    if (buf.nonEmpty) {
-      val programSrc = buf.result(); buf.clear()
-      evalAndPrint(programSrc)
+      (portfolioManager.getPortfolio, lastPlan)
     }
-
-    (portfolioManager.getPortfolio, lastPlan)
   }
 
 }
-

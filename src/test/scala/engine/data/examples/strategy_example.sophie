@@ -1,0 +1,12 @@
+// A small strategy mixing portfolio and rules
+PORTFOLIO =
+  5000 EUR OF VWCE
+  + 1000 USD OF AAPL;
+
+SELL 1000 USD OF AAPL IF
+  PRICE(AAPL) > 150
+  && RSI(AAPL, 14) > 70;
+
+BUY 1000 EUR OF MSFT IF
+  MAVG(MSFT, 20) > MAVG(MSFT, 50)
+  && RSI(MSFT, 14) < 40;
