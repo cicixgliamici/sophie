@@ -39,6 +39,7 @@ SELL       : 'SELL' ;
 OF         : 'OF' ;
 IF         : 'IF' ;
 PORTFOLIO  : 'PORTFOLIO' ;
+QTY        : 'QTY' ;
 
 /*
   IDENTIFIER comes after keywords (very important). This prevents keywords from
@@ -97,7 +98,7 @@ statement
   allow both IDENTIFIER and CURRENCY to represent a tradable instrument.
 */
 trade_cmd
-  : (BUY | SELL) value OF symbol (IF condition)?
+  : (BUY | SELL) consideration OF symbol (IF condition)?
   ;
 
 /*
@@ -119,6 +120,9 @@ allocation
   A numeric value tied to a currency, e.g., "1500 EUR", "0.5 BTC".
 */
 value            : NUMBER CURRENCY ;
+/* A quantity literal tagged explicitly with QTY. */
+consideration    : value | quantity ;
+quantity         : QTY NUMBER ;
 /*
   Boolean expressions with precedence:
     OR (lowest) < AND < comparison (highest)
@@ -242,6 +246,9 @@ symbol
    SELL 0.5 BTC OF BTC
      IF BTC.volume > 1000000
      && STDDEV(BTC, 20) > PRICE(BTC)
+
+  Explicit quantity (bypassing price conversion):
+     SELL QTY 5 OF AAPL
 
    Portfolio definition:
 
