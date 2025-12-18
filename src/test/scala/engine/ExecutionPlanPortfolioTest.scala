@@ -10,12 +10,16 @@ class ExecutionPlanPortfolioTest extends AnyFunSuite {
     Evaluator.evaluate(SophieParserFacade.parseString(src), InMemoryMarketData())
 
   test("Program without PORTFOLIO produces portfolio = None") {
+    // The Evaluator should not invent a portfolio section if the program lacks one.
+    // This ensures downstream code can check `plan.portfolio.isEmpty` to detect absence.
     val src = """BUY 1 EUR OF A IF 1 > 0;"""
     val plan = eval(src)
     assert(plan.portfolio.isEmpty)
   }
 
   test("Only the first PORTFOLIO is kept if multiple are present") {
+    // Grammar allows multiple statements, but semantics dictate that only the first
+    // PORTFOLIO block is honored. Later ones are ignored to avoid conflicting targets.
     val src =
       """PORTFOLIO = 100 EUR OF A + 200 EUR OF B;
         |PORTFOLIO = 999 EUR OF C;  // should be ignored by Evaluator
