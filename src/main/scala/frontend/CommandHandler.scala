@@ -1,6 +1,3 @@
-+162
--72
-
 package frontend
 
 import SophieTui.{PasteBuffer, SessionState}
