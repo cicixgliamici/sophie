@@ -11,19 +11,11 @@ import upickle.default.{read, write}
 
 object SophieTui {
 
-  // ---- State ----
-  private case class SessionState(
+  case class SessionState(
     md: InMemoryMarketData,
     lastPlan: Option[ExecutionPlan],
     lastProgramSrc: Option[String]
   )
-
-  private var state: SessionState = SessionState(InMemoryMarketData(), None, None)
-
-  private def updateState(f: SessionState => SessionState): Unit = state = f(state)
-  private def md: InMemoryMarketData                          = state.md
-  private def lastPlan: Option[ExecutionPlan]                 = state.lastPlan
-  private def lastProgramSrc: Option[String]                  = state.lastProgramSrc
 
   private[frontend] case class PasteBuffer(lines: Vector[String] = Vector.empty) {
     def nonEmpty: Boolean = lines.nonEmpty
@@ -40,14 +32,15 @@ object SophieTui {
   private val printer: TuiPrinter = DefaultPrinter
 
   // PortfolioManager and CommandHandler instances
-  private lazy val portfolioManager: PortfolioManager = new PortfolioManager(sym => md.price(sym), printer)
-  private lazy val commandHandler: CommandHandler = new CommandHandler(sym => md.price(sym), portfolioManager, printer)
+  private lazy val portfolioManager: PortfolioManager = new PortfolioManager()
+
+  private lazy val commandHandler: CommandHandler = new CommandHandler(actions, portfolioManager)
 
   def run(): Unit = {
     println("Sophie TUI - type :help for commands. Paste DSL, blank line to run.")
 
     @tailrec
-    def loop(buf: PasteBuffer): Unit = {
+    def loop(session: SessionState, portfolio: PortfolioState, buf: PasteBuffer): Unit = {
       val prompt = if (buf.nonEmpty) "... " else "sophie> "
       val raw    = readLine(prompt)
       val line   = normalizeForCommand(raw)
@@ -55,229 +48,230 @@ object SophieTui {
       (line, raw) match {
         case (null, _) => println("Bye.")
         case (l, _) if l.isEmpty && buf.nonEmpty =>
-          evalAndPrint(buf.result)
-          loop(PasteBuffer.empty)
+          val (nextSession, log) = evalAndCollect(buf.result, session)
+          log.foreach(printer.printlnLine)
+          loop(nextSession, portfolio, PasteBuffer.empty)
         case (l, _) if l != null && l.startsWith(":") =>
-          val (keepGoing, nextBuf) = handleCommand(l, buf)
-          if (keepGoing) loop(nextBuf) else println("Bye.")
+          val result = commandHandler.handle(l, session, portfolio, buf)
+          result.log.foreach(printer.printlnLine)
+          if (result.continue) loop(result.session, result.portfolio, result.buffer) else println("Bye.")
         case (_, r) if r != null =>
           // appendiamo la riga *come è stata inserita* nel buffer (preserviamo eventuali spazi interni)
-          loop(buf.append(r))
+          loop(session, portfolio, buf.append(r))
         case _ => println("Bye.")
       }
     }
 
-    loop(PasteBuffer.empty)
+    loop(SessionState(InMemoryMarketData(), None, None), portfolioManager.empty, PasteBuffer.empty)
   }
-
-  // -------- Command handling --------
-  private def handleCommand(cmd: String, buf: PasteBuffer): (Boolean, PasteBuffer) =
-    commandHandler.handle(cmd, buf)
 
   // helper: normalizza la riga per rilevare comandi (rimuove BOM e caratteri di controllo invisibili)
   private def normalizeForCommand(line: String): String = {
     if (line == null) null
     else line.replace("\uFEFF", "").replaceAll("\\p{C}", "").trim
   }
+  private val helpLines: Vector[String] =
+    """Commands:
+      |  :pf save <path.json>
+      |  :pf load <path.json>
+      |  :load md <path.json>
+      |  :save md <path.json>
+      |  :run  prog <file.sophie>
+      |  :save prog <file.sophie>
+      |  :compile ir <file.json>   - compile last plan to IR (JSON)
+      |  :exec ir <file.json>      - execute IR, update portfolio & ledger
+      |
+      |  :help
+      |  :q | :quit
+      |  :show md
+      |  :show last
+      |  :set price <SYM> <VALUE>
+      |  :set series <SYM> <FIELD> <v1,...>
+      |  :set ovr <NAME> <SYM> <PERIOD> <V>
+      |
+      |  :pf new   - reset portfolio
+      |  :pf show  - show positions and mark-to-market (if prices available)
+      |  :pf apply - apply last execution plan (EXECUTE trades only)
+      |  :pf preview - preview last plan without mutating portfolio
+      |
+      |Paste a multi-line Sophie program; submit with an empty line.
+      |Lines that start with ':' are always treated as TUI commands (even when pasting).
+      |""".stripMargin.linesIterator.toVector
 
-  private def printHelp(): Unit = {
-    println(
-      """Commands:
-        |  :pf save <path.json>
-        |  :pf load <path.json>
-        |  :load md <path.json>
-        |  :save md <path.json>
-        |  :run  prog <file.sophie>
-        |  :save prog <file.sophie>
-        |  :compile ir <file.json>   - compile last plan to IR (JSON)
-        |  :exec ir <file.json>      - execute IR, update portfolio & ledger
-        |
-        |  :help
-        |  :q | :quit
-        |  :show md
-        |  :set price <SYM> <VALUE>
-        |  :set series <SYM> <FIELD> <v1,...>
-        |  :set ovr <NAME> <SYM> <PERIOD> <V>
-        |
-        |  :pf new   - reset portfolio
-        |  :pf show  - show positions and mark-to-market (if prices available)
-        |  :pf apply - apply last execution plan (EXECUTE trades only)
-        |
-        |Paste a multi-line Sophie program; submit with an empty line.
-        |Lines that start with ':' are always treated as TUI commands (even when pasting).
-        |""".stripMargin)
+  private val actions: TuiActions = new TuiActions {
+    override def help: Vector[String] = helpLines
+
+    override def showMd(session: SessionState): Vector[String] = renderMarketData(session.md)
+
+    override def showLast(session: SessionState): Vector[String] =
+      session.lastProgramSrc
+        .map(src => Vector("\n=== Last program source ===") ++ src.split("\n").toVector)
+        .getOrElse(Vector("No program source available."))
+
+    override def setPrice(session: SessionState, sym: String, v: String): (SessionState, Vector[String]) =
+      try {
+        val value = BigDecimal(v)
+        val next = session.copy(md = session.md.copy(prices = session.md.prices + (sym -> value)))
+        (next, Vector(s"Set PRICE($sym) = ${fmt(value)}"))
+      } catch { case NonFatal(e) => (session, Vector(s"Error: ${e.getMessage}")) }
+
+    override def setSeries(session: SessionState, s: String, f: String, csv: String): (SessionState, Vector[String]) =
+      try {
+        val vs    = csv.split(",").toVector.map(v => BigDecimal(v.trim))
+        val next  = session.copy(md = session.md.copy(seriesData = session.md.seriesData + ((s -> f) -> vs)))
+        val last  = vs.lastOption.map(fmt).getOrElse("n/a")
+        (next, Vector(s"Set SERIES $s.$f (${vs.length} points, last=$last)"))
+      } catch { case NonFatal(e) => (session, Vector(s"Error: ${e.getMessage}")) }
+
+    override def setOverride(session: SessionState, n: String, s: String, p: String, v: String): (SessionState, Vector[String]) =
+      try {
+        val period = p.toInt
+        val value  = BigDecimal(v)
+        val key    = IndicatorKey(n.toUpperCase, s, period)
+        val next   = session.copy(md = session.md.copy(indicatorOverrides = session.md.indicatorOverrides + (key -> value)))
+        (next, Vector(s"Set OVERRIDE $n($s,$period) = ${fmt(value)}"))
+      } catch {
+        case _: NumberFormatException => (session, Vector("Error: PERIOD must be an integer"))
+        case NonFatal(e)              => (session, Vector(s"Error: ${e.getMessage}"))
+      }
+
+    override def loadMd(session: SessionState, path: String): (SessionState, Vector[String]) =
+      try {
+        val p = Paths.get(path)
+        val json =
+          if (Files.exists(p)) Files.readString(p, UTF_8)
+          else {
+            val is = Option(getClass.getClassLoader.getResourceAsStream(path))
+              .getOrElse(throw new IllegalArgumentException(s"Not found: $path (neither file nor classpath resource)"))
+            try new String(is.readAllBytes(), UTF_8) finally is.close()
+          }
+
+        val j     = read[MdJsonCodec.MarketDataJ](json)
+        val next  = session.copy(md = MdJsonCodec.fromJ(j))
+        val lines = Vector(s"Loaded MarketData from $path (prices=${next.md.prices.size}, series=${next.md.seriesData.size}, overrides=${next.md.indicatorOverrides.size})")
+        (next, lines)
+      } catch { case e: Exception => (session, Vector(s"Error loading $path: ${e.getMessage}")) }
+
+    override def saveMd(session: SessionState, path: String): (SessionState, Vector[String]) =
+      try {
+        ensureParentDir(path)
+        val j    = MdJsonCodec.toJ(session.md)
+        val json = write(j, indent = 2)
+        Files.writeString(Paths.get(path), json, UTF_8)
+        (session, Vector(s"Saved MarketData to $path"))
+      } catch { case e: Exception => (session, Vector(s"Error saving $path: ${e.getMessage}")) }
+
+    override def runProg(session: SessionState, path: String): (SessionState, Vector[String]) =
+      try {
+        val src = Files.readString(Paths.get(path), UTF_8)
+        evalAndCollect(src, session)
+      } catch { case e: Exception => (session, Vector(s"Error loading program: ${e.getMessage}")) }
+
+    override def saveProg(session: SessionState, path: String): (SessionState, Vector[String]) =
+      session.lastProgramSrc match {
+        case Some(src) =>
+          try {
+            ensureParentDir(path)
+            Files.writeString(Paths.get(path), src, UTF_8)
+            (session, Vector(s"Saved last program to $path"))
+          } catch { case e: Exception => (session, Vector(s"Error saving program: ${e.getMessage}")) }
+        case None => (session, Vector("No program to save. Evaluate a program first."))
+      }
+
+    override def compileIr(session: SessionState, path: String): (SessionState, Vector[String]) =
+      session.lastPlan match {
+        case None => (session, Vector("No plan. Evaluate a program first."))
+        case Some(plan) =>
+          try {
+            ensureParentDir(path)
+
+            Lowering.from(plan, session.md, source = "tui") match {
+              case Left(err) => (session, Vector(s"Error lowering to instructions: $err"))
+              case Right(instrs) =>
+                val json = write(instrs, indent = 2)
+                Files.writeString(Paths.get(path), json, UTF_8)
+                (session, Vector(s"Wrote IR instructions to $path (${instrs.size} op)"))
+            }
+          } catch { case e: Exception => (session, Vector(s"Error: ${e.getMessage}")) }
+      }
+
+    override def execIr(session: SessionState, path: String): (SessionState, Vector[String]) =
+      try {
+        val json   = Files.readString(Paths.get(path), UTF_8)
+        val instrs = read[List[Instruction]](json)
+        // default storage under ./data
+        ensureParentDir("data/portfolio.json")
+        ensureParentDir("data/ledger.ndjson")
+        val pfStore = FileJsonPortfolioStore(Paths.get("data/portfolio.json"))
+        val ledger  = FileLedger(Paths.get("data/ledger.ndjson"))
+        val events  = Executor.run(instrs, session.md, pfStore, ledger, source = s"ir:${Paths.get(path).getFileName}")
+        ReceiptPrinter.printReceipts(events)
+        (session, Vector(s"Executed ${instrs.size} instruction(s). Portfolio saved, ledger appended."))
+      } catch { case e: Exception => (session, Vector(s"Error executing IR: ${e.getMessage}")) }
+
+    override def evalBuffer(session: SessionState, buf: PasteBuffer): (SessionState, Vector[String]) =
+      evalAndCollect(buf.result, session)
   }
 
-  // -------- MarketData IO --------
-  private def loadMd(path: String): Unit = {
-    try {
-      val p = Paths.get(path)
-      val json =
-        if (Files.exists(p)) Files.readString(p, UTF_8)
-        else {
-          val is = Option(getClass.getClassLoader.getResourceAsStream(path))
-            .getOrElse(throw new IllegalArgumentException(
-              s"Not found: $path (neither file nor classpath resource)"
-            ))
-          try new String(is.readAllBytes(), UTF_8) finally is.close()
-        }
-
-      val j  = read[MdJsonCodec.MarketDataJ](json)
-      updateState(_.copy(md = MdJsonCodec.fromJ(j)))
-      println(s"Loaded MarketData from $path (prices=${md.prices.size}, series=${md.seriesData.size}, overrides=${md.indicatorOverrides.size})")
-    } catch { case e: Exception => println(s"Error loading $path: ${e.getMessage}") }
-  }
-
-  private def saveMd(path: String): Unit = {
-    try {
-      ensureParentDir(path)
-      val j = MdJsonCodec.toJ(md)
-      val json = write(j, indent = 2)
-      Files.writeString(Paths.get(path), json, UTF_8)
-      println(s"Saved MarketData to $path")
-    } catch { case e: Exception => println(s"Error saving $path: ${e.getMessage}") }
-  }
-
-  // -------- Manual MD edits --------
-  private def setPrice(sym: String, valueStr: String): Unit =
-    try {
-      val v = BigDecimal(valueStr)
-      updateState(st => st.copy(md = st.md.copy(prices = st.md.prices + (sym -> v))))
-      println(s"Set PRICE($sym) = ${fmt(v)}")
-    } catch { case NonFatal(e) => println(s"Error: ${e.getMessage}") }
-
-  private def setSeries(sym: String, field: String, valuesCsv: String): Unit =
-    try {
-      val vs = valuesCsv.split(",").toVector.map(s => BigDecimal(s.trim))
-      updateState(st => st.copy(md = st.md.copy(seriesData = st.md.seriesData + ((sym -> field) -> vs))))
-      val last = vs.lastOption.map(fmt).getOrElse("n/a")
-      println(s"Set SERIES $sym.$field (${vs.length} points, last=$last)")
-    } catch { case NonFatal(e) => println(s"Error: ${e.getMessage}") }
-
-  private def setOverride(name: String, sym: String, periodStr: String, valueStr: String): Unit =
-    try {
-      val p = periodStr.toInt
-      val v = BigDecimal(valueStr)
-      val key = IndicatorKey(name.toUpperCase, sym, p)
-      updateState(st => st.copy(md = st.md.copy(indicatorOverrides = st.md.indicatorOverrides + (key -> v))))
-      println(s"Set OVERRIDE $name($sym,$p) = ${fmt(v)}")
-    } catch {
-      case _: NumberFormatException => println("Error: PERIOD must be an integer")
-      case e: Exception             => println(s"Error: ${e.getMessage}")
-    }
-
-  // -------- Evaluation --------
-  private def evalAndPrint(programSrc: String): Unit = {
+  private def evalAndCollect(programSrc: String, session: SessionState): (SessionState, Vector[String]) = {
     try {
       val cleaned = if (programSrc != null) programSrc.replace("\uFEFF", "") else programSrc
-      val res = ProgramEvaluator.evaluate(cleaned, md)
+      val res     = ProgramEvaluator.evaluate(cleaned, session.md)
+      val plan    = res.plan
+      val next    = session.copy(lastPlan = Some(plan), lastProgramSrc = Some(programSrc))
 
-      // print warnings via printer
-      res.warnings.foreach(w => printer.printlnLine(s"[Warning] $w. Set them with ':set price <SYM> <VALUE>' before applying the plan."))
-
-      val plan = res.plan
-      updateState(_.copy(lastPlan = Some(plan), lastProgramSrc = Some(programSrc)))
-
-      // reuse existing prettyPrint but route outputs through printer
-      printer.printlnLine("\n=== Execution Plan ===")
-      if (plan.trades.isEmpty) printer.printlnLine(" - (no trades)")
-      plan.trades.foreach { d =>
+      val header  = Vector("\n=== Execution Plan ===")
+      val trades  = if (plan.trades.isEmpty) Vector(" - (no trades)") else plan.trades.toVector.map { d =>
         val status = if (d.shouldExecute) "EXECUTE" else "SKIP"
-        printer.printlnLine(s" - [$status] ${d.detail}")
+        s" - [$status] ${d.detail}"
       }
-      plan.portfolio match {
+      val portfolioLines = plan.portfolio match {
         case Some(p) =>
-          printer.printlnLine(" - [PORTFOLIO] target allocations:")
-          p.allocations.foreach { a =>
-            printer.printlnLine(s"   * ${fmt(a.value.amount)} ${a.value.currency} OF ${a.symbol}")
+          Vector(" - [PORTFOLIO] target allocations:") ++ p.allocations.map { a =>
+            s"   * ${fmt(a.value.amount)} ${a.value.currency} OF ${a.symbol}"
           }
-        case None => ()
+        case None => Vector.empty[String]
       }
-      printer.printlnLine("")
 
-    } catch { case NonFatal(e) => printer.printlnLine(s"[Error] ${e.getMessage}") }
+      val warnings = res.warnings.map(w => s"[Warning] $w. Set them with ':set price <SYM> <VALUE>' before applying the plan.").toVector
+
+      (next, warnings ++ header ++ trades ++ portfolioLines :+ "")
+    } catch { case NonFatal(e) => (session, Vector(s"[Error] ${e.getMessage}")) }
   }
 
-  private def prettyPrint(plan: ExecutionPlan): Unit = {
-    println("\n=== Execution Plan ===")
-    if (plan.trades.isEmpty) println(" - (no trades)")
-    plan.trades.foreach { d =>
-      val status = if (d.shouldExecute) "EXECUTE" else "SKIP"
-      println(s" - [$status] ${d.detail}")
-    }
-    plan.portfolio match {
-      case Some(p) =>
-        println(" - [PORTFOLIO] target allocations:")
-        p.allocations.foreach { a =>
-          println(s"   * ${fmt(a.value.amount)} ${a.value.currency} OF ${a.symbol}")
-        }
-      case None => ()
-    }
-    println()
+  private def renderMarketData(md: InMemoryMarketData): Vector[String] = {
+    val pricesHeader = Vector("Prices:")
+    val pricesBody =
+      if (md.prices.isEmpty) Vector("  (empty)")
+      else md.prices.toSeq.sortBy(_._1).map { case (s, v) => f"  - $s%-6s = ${fmt(v)}" }.toVector
+
+    val seriesHeader = Vector("", "Series (symbol.field -> last value):")
+    val seriesBody =
+      if (md.seriesData.isEmpty) Vector("  (empty)")
+      else md.seriesData.toSeq.sortBy { case ((s, f), _) => s"$s.$f" }.map {
+        case ((s, f), vec) =>
+          val last = vec.lastOption.map(fmt).getOrElse("n/a")
+          f"  - $s.$f%-14s len=${vec.length}%d last=$last"
+      }.toVector
+
+    val overridesHeader = Vector("", "Indicator overrides:")
+    val overridesBody =
+      if (md.indicatorOverrides.isEmpty) Vector("  (empty)")
+      else md.indicatorOverrides.toSeq.sortBy(kv => (kv._1.name, kv._1.symbol, kv._1.period)).map {
+        case (IndicatorKey(n, s, p), v) => s"  - $n($s,$p) = ${fmt(v)}"
+      }.toVector
+
+    pricesHeader ++ pricesBody ++ seriesHeader ++ seriesBody ++ overridesHeader ++ overridesBody :+ ""
   }
 
-  // -------- Program IO --------
-  private def runProg(path: String): Unit =
-    try {
-      val src = Files.readString(Paths.get(path), UTF_8)
-      evalAndPrint(src)
-    } catch { case e: Exception => println(s"Error loading program: ${e.getMessage}") }
+  private def fmt(x: BigDecimal): String =
+    x.bigDecimal.stripTrailingZeros.toPlainString
 
-  private def saveProg(path: String): Unit =
-    lastProgramSrc match {
-      case Some(src) =>
-        try {
-          ensureParentDir(path)
-          Files.writeString(Paths.get(path), src, UTF_8)
-          println(s"Saved last program to $path")
-        } catch { case e: Exception => println(s"Error saving program: ${e.getMessage}") }
-      case None =>
-        println("No program to save. Evaluate a program first.")
-    }
-
-  // -------- IR / Executor integration --------
-  private def compileIr(path: String): Unit = {
-    lastPlan match {
-      case None => println("No plan. Evaluate a program first.")
-      case Some(plan) =>
-        try {
-          ensureParentDir(path)
-
-          Lowering.from(plan, md, source = "tui") match {
-            case Left(err) => println(s"Error lowering to instructions: $err")
-            case Right(instrs) =>
-              val json = write(instrs, indent = 2)
-              Files.writeString(Paths.get(path), json, UTF_8)
-              println(s"Wrote IR instructions to $path (${instrs.size} op)")
-          }
-        } catch { case e: Exception => println(s"Error: ${e.getMessage}") }
-    }
+  private def ensureParentDir(path: String): Unit = {
+    val p = Paths.get(path)
+    val parent = p.getParent
+    if (parent != null && !Files.exists(parent)) Files.createDirectories(parent)
   }
-
-  private def execIr(path: String): Unit = {
-    try {
-      val json = Files.readString(Paths.get(path), UTF_8)
-      val instrs = read[List[Instruction]](json)
-      // default storage under ./data
-      ensureParentDir("data/portfolio.json")
-@@ -441,75 +304,52 @@ object SophieTui {
-  def printMarketDataPublic(): Unit = printMarketData()
-  def printLast(): Unit = lastProgramSrc match { case Some(src) => printer.printlnLine("\n=== Last program source ===\n" + src); case None => printer.printlnLine("No program source available.") }
-
-  def setPricePublic(sym: String, v: String): Unit = setPrice(sym, v)
-  def setSeriesPublic(s: String, f: String, csv: String): Unit = setSeries(s, f, csv)
-  def setOverridePublic(n: String, s: String, p: String, v: String): Unit = setOverride(n, s, p, v)
-
-  def loadMdPublic(path: String): Unit = loadMd(path)
-  def saveMdPublic(path: String): Unit = saveMd(path)
-
-  def runProgPublic(path: String): Unit = runProg(path)
-  def saveProgPublic(path: String): Unit = saveProg(path)
-
-  def getLastPlan: Option[ExecutionPlan] = lastPlan
-  def compileIrPublic(path: String): Unit = compileIr(path)
-  def execIrPublic(path: String): Unit = execIr(path)
-  def evalAndPrintPublic(src: String): Unit = evalAndPrint(src)
 
   /**
    * Simulate a TUI session programmatically.
@@ -285,31 +279,31 @@ object SophieTui {
    * This helper is intended for tests only.
    */
   def simulateSession(inputs: Seq[String]): (Map[String, BigDecimal], Option[engine.ExecutionPlan]) = {
-    // reset transient state to have a clean session (isolate MD and portfolio)
-    updateState(_ => SessionState(InMemoryMarketData(), None, None))
-    portfolioManager.reset()
-
     @tailrec
-    def process(rem: Seq[String], buf: PasteBuffer): PasteBuffer = rem match {
-      case Nil =>
-        if (buf.nonEmpty) { evalAndPrint(buf.result); PasteBuffer.empty } else buf
-      case raw +: tail =>
-        val line = normalizeForCommand(raw)
-        line match {
-          case null => buf
-          case l if l.isEmpty && buf.nonEmpty =>
-            evalAndPrint(buf.result)
-            process(tail, PasteBuffer.empty)
-          case l if l != null && l.startsWith(":") =>
-            val (_, nextBuf) = handleCommand(l, buf)
-            process(tail, nextBuf)
-          case _ => process(tail, buf.append(raw))
-        }
-    }
+    def process(rem: Seq[String], session: SessionState, portfolio: PortfolioState, buf: PasteBuffer): (SessionState, PortfolioState, PasteBuffer) =
+      rem match {
+        case Nil =>
+          if (buf.nonEmpty) {
+            val (nextSession, _) = evalAndCollect(buf.result, session)
+            (nextSession, portfolio, PasteBuffer.empty)
+          } else (session, portfolio, buf)
+        case raw +: tail =>
+          val line = normalizeForCommand(raw)
+          line match {
+            case null => (session, portfolio, buf)
+            case l if l.isEmpty && buf.nonEmpty =>
+              val (nextSession, _) = evalAndCollect(buf.result, session)
+              process(tail, nextSession, portfolio, PasteBuffer.empty)
+            case l if l != null && l.startsWith(":") =>
+              val result = commandHandler.handle(l, session, portfolio, buf)
+              process(tail, result.session, result.portfolio, result.buffer)
+            case _ => process(tail, session, portfolio, buf.append(raw))
+          }
+      }
 
-    process(inputs, PasteBuffer.empty)
+    val (finalSession, finalPortfolio, _) = process(inputs, SessionState(InMemoryMarketData(), None, None), portfolioManager.empty, PasteBuffer.empty)
 
-    (portfolioManager.getPortfolio, lastPlan)
+    (finalPortfolio.positions, finalSession.lastPlan)
   }
 
 }
