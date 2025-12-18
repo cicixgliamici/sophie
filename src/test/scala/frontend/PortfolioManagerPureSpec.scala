@@ -15,7 +15,7 @@ class PortfolioManagerPureSpec extends AnyFunSuite {
 
   // Verify that applying a BUY instruction increases holdings by the expected quantity
   test("pureApplyPlan applies buys and updates state") {
-    val pm = new PortfolioManager(_ => Some(BigDecimal(10)), DummyPrinter)
+    val pm = new PortfolioManager()
     val initial = PortfolioState(Map("A" -> BigDecimal(1)), BigDecimal(0))
     val plan = ExecutionPlan(List(mkTradeDecision(Buy, "A", BigDecimal(20), "EUR")), None)
 
@@ -28,7 +28,7 @@ class PortfolioManagerPureSpec extends AnyFunSuite {
 
   // Ensure SELL is skipped when there are no holdings to reduce
   test("pureApplyPlan skips sell when no holdings") {
-    val pm = new PortfolioManager(_ => None, DummyPrinter)
+    val pm = new PortfolioManager()
     val initial = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
     val plan = ExecutionPlan(List(mkTradeDecision(Sell, "X", BigDecimal(10), "EUR")), None)
 
@@ -40,7 +40,7 @@ class PortfolioManagerPureSpec extends AnyFunSuite {
 
   // Preview should return the new state without mutating the original portfolio passed in
   test("purePreviewPlan does not mutate state") {
-    val pm = new PortfolioManager(_ => Some(BigDecimal(5)), DummyPrinter)
+    val pm = new PortfolioManager()
     val initial = PortfolioState(Map("B" -> BigDecimal(2)), BigDecimal(0))
     val plan = ExecutionPlan(List(mkTradeDecision(Buy, "B", BigDecimal(50), "EUR")), None)
 
@@ -54,7 +54,7 @@ class PortfolioManagerPureSpec extends AnyFunSuite {
 
   // Missing market price should result in no applied trades and a clear message
   test("pureApplyPlan handles missing price with message") {
-    val pm = new PortfolioManager(_ => None, DummyPrinter)
+    val pm = new PortfolioManager()
     val initial = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
     val plan = ExecutionPlan(List(mkTradeDecision(Buy, "Y", BigDecimal(100), "EUR")), None)
 
