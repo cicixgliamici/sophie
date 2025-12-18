@@ -1,32 +1,35 @@
+package frontend
 
+import java.nio.file.{Files, Paths}
+import java.nio.charset.StandardCharsets.UTF_8
+import upickle.default.{read, write}
+import scala.util.control.NonFatal
+import scala.math.BigDecimal.RoundingMode
 import engine._
 
-class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinter) {
-  // Manages the portfolio state used by the TUI and encapsulates all
-  // persistence/printing logic. This way we can reuse the same functions in
-  // both the interactive interface and automated tests.
+class PortfolioManager {
+  // Stateless helper that provides pure portfolio transitions and combines them
+  // with persistence/printing helpers. TUI callers thread `PortfolioState`
+  // explicitly to keep command handling referentially transparent.
 
-  private var portfolio: PortfolioState = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
-  private def positions: Map[String, BigDecimal] = portfolio.positions.withDefaultValue(BigDecimal(0))
+  val empty: PortfolioState = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
 
   private def fmt(x: BigDecimal): String = x.bigDecimal.stripTrailingZeros.toPlainString
   private def fmtQty(x: BigDecimal): String = try { x.setScale(10, RoundingMode.HALF_UP).bigDecimal.stripTrailingZeros.toPlainString } catch { case _: Throwable => x.bigDecimal.stripTrailingZeros.toPlainString }
 
-  def reset(): Unit = {
-    portfolio = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
-    printer.printlnLine("Portfolio reset.")
-  }
+  def reset(): (PortfolioState, Vector[String]) =
+    (empty, Vector("Portfolio reset."))
 
-  def getPortfolio: Map[String, BigDecimal] = portfolio.positions
-  def getPortfolioState: PortfolioState = portfolio
+  def show(state: PortfolioState, priceFn: String => Option[BigDecimal]): Vector[String] = {
+    val header = Vector("\n=== Portfolio ===")
+    val base =
+      if (state.positions.isEmpty) Vector(" - (empty)")
+      else Vector.empty[String]
+    val cash = if (state.cash != 0) Vector(s" - cash: ${fmt(state.cash)}") else Vector.empty[String]
 
-  def show(): Unit = {
-    printer.printlnLine("\n=== Portfolio ===")
-    if (portfolio.positions.isEmpty) printer.printlnLine(" - (empty)")
-    if (portfolio.cash != 0) printer.printlnLine(s" - cash: ${fmt(portfolio.cash)}")
-    val (total, lines) = portfolio.positions.toSeq
+    val (total, lines) = state.positions.toSeq
       .sortBy(_._1)
-      .foldLeft((BigDecimal(0), List.empty[String])) { case ((acc, accLines), (sym, qty)) =>
+      .foldLeft((BigDecimal(0), Vector.empty[String])) { case ((acc, accLines), (sym, qty)) =>
         val (line, delta) = priceFn(sym) match {
           case Some(px) =>
             val v = qty * px
@@ -36,45 +39,44 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
         (acc + delta, accLines :+ s" - $line")
       }
 
-    lines.foreach(printer.printlnLine)
-    if (total > 0 || portfolio.cash != 0) printer.printlnLine(s"Total M2M value ~ ${fmt(total + portfolio.cash)}")
-    printer.printlnLine("")
+    val totals = if (total > 0 || state.cash != 0) Vector(s"Total M2M value ~ ${fmt(total + state.cash)}", "") else Vector("")
+    header ++ base ++ cash ++ lines ++ totals
   }
 
-  def save(path: String): Unit = {
+  def save(state: PortfolioState, path: String): Vector[String] = {
     try {
       val p = Paths.get(path)
       val parent = p.getParent
       if (parent != null && !Files.exists(parent)) Files.createDirectories(parent)
-      val json = write(PortfolioJson.PortfolioJ(portfolio.positions.filter(_._2 > 0), Some(portfolio.cash)), indent = 2)
+      val json = write(PortfolioJson.PortfolioJ(state.positions.filter(_._2 > 0), Some(state.cash)), indent = 2)
       Files.writeString(p, json, UTF_8)
-      printer.printlnLine(s"Saved portfolio to $path")
-    } catch { case NonFatal(e) => printer.printlnLine(s"Error saving portfolio: ${e.getMessage}") }
+      Vector(s"Saved portfolio to $path")
+    } catch { case NonFatal(e) => Vector(s"Error saving portfolio: ${e.getMessage}") }
   }
 
-  def load(path: String): Unit = {
+  def load(path: String): (PortfolioState, Vector[String]) = {
     try {
       val json = Files.readString(Paths.get(path), UTF_8)
       val pj = read[PortfolioJson.PortfolioJ](json)
-      portfolio = PortfolioState(pj.positions.withDefaultValue(BigDecimal(0)), pj.cash.getOrElse(BigDecimal(0)))
-      printer.printlnLine(s"Loaded portfolio from $path (positions=${portfolio.positions.count(_._2>0)})")
-    } catch { case NonFatal(e) => printer.printlnLine(s"Error loading portfolio: ${e.getMessage}") }
+      val st = PortfolioState(pj.positions.withDefaultValue(BigDecimal(0)), pj.cash.getOrElse(BigDecimal(0)))
+      (st, Vector(s"Loaded portfolio from $path (positions=${st.positions.count(_._2>0)})"))
+    } catch { case NonFatal(e) => (empty, Vector(s"Error loading portfolio: ${e.getMessage}")) }
   }
 
   private def computeQuantity(
     value: ast.Value,
     sym: String,
     mdPriceFn: String => Option[BigDecimal],
-    msgs: List[String]
-  ): (BigDecimal, List[String]) =
+    msgs: Vector[String]
+  ): (BigDecimal, Vector[String]) =
     if (value.currency == sym) (value.amount, msgs)
     else mdPriceFn(sym) match {
       case Some(px) if px != 0 => (value.amount / px, msgs)
       case _ => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(value.amount)} ${value.currency} to quantity")
     }
 
-  private def foldTrades(trades: Seq[TradeDecision], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, List[String]) =
-    trades.foldLeft((state, 0, List.empty[String])) {
+  private def foldTrades(trades: Seq[TradeDecision], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, Vector[String]) =
+    trades.foldLeft((state, 0, Vector.empty[String])) {
       case ((st, appl, msgs), d) =>
         val sym = d.cmd.symbol
         val v   = d.cmd.value
@@ -102,12 +104,12 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
     state: PortfolioState,
     emptyPlanMsg: String,
     finalMsg: Int => String
-  ): (PortfolioState, Int, List[String]) =
+  ): (PortfolioState, Int, Vector[String]) =
     planOpt match {
-      case None => (state, 0, List(emptyPlanMsg))
+      case None => (state, 0, Vector(emptyPlanMsg))
       case Some(plan) =>
         val exec = plan.trades.filter(_.shouldExecute)
-        if (exec.isEmpty) (state, 0, List("No EXECUTE trades in last plan."))
+        if (exec.isEmpty) (state, 0, Vector("No EXECUTE trades in last plan."))
         else {
           val (finalState, applied, msgs) = foldTrades(exec, mdPriceFn, state)
           val finalFiltered = finalState.copy(positions = finalState.positions.filter { case (_, q) => q > 0 })
@@ -115,34 +117,26 @@ class PortfolioManager(priceFn: String => Option[BigDecimal], printer: TuiPrinte
         }
     }
 
-  // Pure transition: apply an optional plan to a given PortfolioState and return the new state,
-  // number of applied trades and a list of messages to display. This is pure and does not use printer.
-  def pureApplyPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, List[String]) =
+  def pureApplyPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, Vector[String]) =
     processPlan(planOpt, mdPriceFn, state, "No plan to apply. Evaluate a program first.", applied => s"Applied $applied trade(s) to portfolio.")
 
-  // Pure preview: returns the resulting PortfolioState, applied count and messages, without side-effects
-  def purePreviewPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, List[String]) =
+  def purePreviewPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, Vector[String]) =
     processPlan(planOpt, mdPriceFn, state, "No plan to preview. Evaluate a program first.", applied => s"Preview: would apply $applied trade(s).")
 
-  // apply an optional plan; returns number of applied trades
-  def applyPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal]): Int = {
-    val (newState, applied, msgs) = pureApplyPlan(planOpt, mdPriceFn, portfolio)
-    msgs.foreach(printer.printlnLine)
-    portfolio = newState
-    // show resulting portfolio similar to previous behavior
-    if (applied > 0) show()
-    applied
+  def applyPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Vector[String]) = {
+    val (newState, applied, msgs) = pureApplyPlan(planOpt, mdPriceFn, state)
+    val summary = if (applied > 0) show(newState, mdPriceFn) else Vector.empty[String]
+    (newState, msgs ++ summary)
   }
 
-  // preview without mutating internal portfolio
-  def previewPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal]): Map[String, BigDecimal] = {
-    val (newState, applied, msgs) = purePreviewPlan(planOpt, mdPriceFn, portfolio)
-    msgs.foreach(printer.printlnLine)
-    if (applied > 0) {
-      printer.printlnLine("Resulting portfolio:")
-      if (newState.positions.isEmpty) printer.printlnLine(" - (empty)")
-      else newState.positions.toSeq.sortBy(_._1).foreach { case (s,q) => printer.printlnLine(s" - $s: qty=${fmt(q)}") }
-    }
-    newState.positions
+  def previewPlan(planOpt: Option[ExecutionPlan], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Vector[String]) = {
+    val (newState, applied, msgs) = purePreviewPlan(planOpt, mdPriceFn, state)
+    val previewLines =
+      if (applied > 0) {
+        val header = Vector("Resulting portfolio:")
+        val body = if (newState.positions.isEmpty) Vector(" - (empty)") else newState.positions.toSeq.sortBy(_._1).map { case (s, q) => s" - $s: qty=${fmt(q)}" }.toVector
+        header ++ body
+      } else Vector.empty[String]
+    (state, msgs ++ previewLines)
   }
 }
