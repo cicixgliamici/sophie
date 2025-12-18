@@ -1,6 +1,10 @@
++13
+-5
+
 package frontend
 
 import scala.math.BigDecimal
+import SophieTui.PasteBuffer
 
 class CommandHandler(priceLookup: String => Option[BigDecimal], portfolioManager: PortfolioManager, printer: TuiPrinter) {
   
@@ -10,9 +14,9 @@ class CommandHandler(priceLookup: String => Option[BigDecimal], portfolioManager
   // helper to expose price lookup to portfolio manager
   private def priceFn(sym: String): Option[BigDecimal] = priceLookup(sym)
 
-  def handle(cmd: String, buf: StringBuilder): Boolean = {
+  def handle(cmd: String, buf: PasteBuffer): (Boolean, PasteBuffer) = {
     val parts = cmd.split("\\s+").toList
-    parts match {
+    val continue = parts match {
       case List(":q") | List(":quit") => false
       case List(":help") =>
         printer.printlnLine(
@@ -38,7 +42,7 @@ class CommandHandler(priceLookup: String => Option[BigDecimal], portfolioManager
         SophieTui.loadMdPublic(path); true
       case List(":save", "md", path) =>
         SophieTui.saveMdPublic(path); true
-
+@@ -42,39 +43,46 @@ class CommandHandler(priceLookup: String => Option[BigDecimal], portfolioManager
       case List(":run", "prog", path) =>
         SophieTui.runProgPublic(path); true
       case List(":save", "prog", path) =>
@@ -64,17 +68,24 @@ class CommandHandler(priceLookup: String => Option[BigDecimal], portfolioManager
 
       case List(":end") =>
         if (buf.nonEmpty) {
-          val programSrc = buf.result(); buf.clear()
-          SophieTui.evalAndPrintPublic(programSrc)
+          SophieTui.evalAndPrintPublic(buf.result)
         } else printer.printlnLine(":end: no program in buffer")
         true
 
       case List(":abort") =>
-        if (buf.nonEmpty) { buf.clear(); printer.printlnLine(":abort: paste buffer cleared") }
+        if (buf.nonEmpty) printer.printlnLine(":abort: paste buffer cleared")
         else printer.printlnLine(":abort: no program in buffer")
         true
 
       case _ => printer.printlnLine(s"Unknown command: $cmd  (try :help)"); true
     }
+
+    val nextBuf = parts match {
+      case List(":end")    => PasteBuffer.empty
+      case List(":abort")   => PasteBuffer.empty
+      case _                 => buf
+    }
+
+    (continue, nextBuf)
   }
 }
