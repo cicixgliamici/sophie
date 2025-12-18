@@ -1,6 +1,3 @@
-+13
--5
-
 package frontend
 
 import scala.math.BigDecimal
