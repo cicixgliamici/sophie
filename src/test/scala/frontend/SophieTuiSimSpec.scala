@@ -20,8 +20,5 @@ class SophieTuiSimSpec extends AnyFunSuite {
     val (pf, plan) = SophieTui.simulateSession(inputs)
     // Expect the buy of 100 EUR at price 100 results in quantity 1
     assert(pf("MSFT") == BigDecimal(1))
-
-    // restore demo price to avoid interfering with other tests
-    SophieTui.setPricePublic("MSFT", "350")
   }
 }
