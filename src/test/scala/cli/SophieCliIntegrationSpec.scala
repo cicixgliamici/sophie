@@ -1,10 +1,10 @@
 package cli
 
 import org.scalatest.funsuite.AnyFunSuite
-import java.nio.file.{Files, Paths}
+import java.nio.file.Files
 import java.nio.charset.StandardCharsets.UTF_8
-import scala.io.Source
 import frontend._
+import upickle.default.read
 
 /**
   * Integration test for the CLI runner.
@@ -36,18 +36,92 @@ class SophieCliIntegrationSpec extends AnyFunSuite {
       // Run CLI main in-process
       cli.SophieCli.main(args)
 
-      // Assertions: portfolio file exists and contains MSFT
+      // Assertions: portfolio file exists and contains expected quantity from EUR conversion
       assert(Files.exists(portfolioPath), "Portfolio file was not created")
       val pfJson = Files.readString(portfolioPath, UTF_8)
-      assert(pfJson.contains("MSFT"), s"Portfolio JSON did not contain MSFT: $pfJson")
+      val pf = read[PortfolioJson.PortfolioJ](pfJson)
+      assert(pf.positions.contains("MSFT"), s"Portfolio JSON did not contain MSFT: $pfJson")
+      assert(pf.positions("MSFT") == BigDecimal("4.6875"), s"Unexpected MSFT quantity: $pfJson")
+      assert(pf.cash.contains(BigDecimal(0)), s"Expected cash to be reset to 0: $pfJson")
 
-      // Ledger exists and contains at least one line with MSFT
+      // Ledger exists and contains a single execution entry
       assert(Files.exists(ledgerPath), "Ledger file was not created")
-      val ledgerText = Files.readAllLines(ledgerPath).toArray.mkString("\n")
-      assert(ledgerText.contains("MSFT"), s"Ledger did not contain MSFT: $ledgerText")
+      val ledgerLines = Files.readAllLines(ledgerPath)
+      assert(ledgerLines.size() == 1, s"Expected one ledger row, got ${ledgerLines.size()}: $ledgerLines")
+      assert(ledgerLines.get(0).contains("MSFT"), s"Ledger did not contain MSFT: ${ledgerLines.get(0)}")
     } finally {
       // cleanup
       try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
     }
+  }
+
+  test("CLI --reset-portfolio clears prior state before executing") {
+    val tmpDir = Files.createTempDirectory("sophie_cli_reset_it_")
+    try {
+      val portfolioPath = tmpDir.resolve("out_pf.json")
+      val ledgerPath = tmpDir.resolve("out_ledger.ndjson")
+      val existing = PortfolioJson.PortfolioJ(positions = Map("MSFT" -> BigDecimal(99), "OLD" -> BigDecimal(1)), cash = Some(BigDecimal(42)))
+      Files.writeString(portfolioPath, upickle.default.write(existing, indent = 2), UTF_8)
+
+      val args = Array(
+        "--file", "src/test/resources/programs/buy_ok.sophie",
+        "--md", "src/main/resources/md_demo.json",
+        "--run",
+        "--portfolio", portfolioPath.toString,
+        "--ledger", ledgerPath.toString,
+        "--reset-portfolio"
+      )
+
+      cli.SophieCli.main(args)
+
+      val pfJson = Files.readString(portfolioPath, UTF_8)
+      val pf = read[PortfolioJson.PortfolioJ](pfJson)
+      assert(pf.positions.getOrElse("MSFT", BigDecimal(0)) == BigDecimal("4.6875"), s"Portfolio was not reset before execution: $pfJson")
+      assert(!pf.positions.contains("OLD"), s"Old positions should have been cleared: $pfJson")
+      assert(pf.cash.contains(BigDecimal(0)), s"Expected cash to be reset to 0: $pfJson")
+    } finally {
+      try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
+    }
+  }
+
+  test("CLI reports an error when the program file is missing") {
+    val tmpDir = Files.createTempDirectory("sophie_cli_missing_")
+    try {
+      val portfolioPath = tmpDir.resolve("out_pf.json")
+      val ledgerPath = tmpDir.resolve("out_ledger.ndjson")
+      val missingProgram = tmpDir.resolve("missing.sophie")
+
+      val args = Array(
+        "--file", missingProgram.toString,
+        "--md", "src/main/resources/md_demo.json",
+        "--run",
+        "--portfolio", portfolioPath.toString,
+        "--ledger", ledgerPath.toString,
+        "--reset-portfolio"
+      )
+
+      val ex = intercept[SecurityException] {
+        withNoExit {
+          cli.SophieCli.main(args)
+        }
+      }
+      assert(ex.getMessage.contains("System.exit"), s"Expected System.exit when file missing, got: ${ex.getMessage}")
+    } finally {
+      try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
+    }
+  }
+
+  private def withNoExit[A](block: => A): A = {
+    val originalManager = System.getSecurityManager
+    System.setSecurityManager(new SecurityManager {
+      override def checkPermission(perm: java.security.Permission): Unit = ()
+      override def checkPermission(perm: java.security.Permission, context: Object): Unit = ()
+      override def checkExit(status: Int): Unit = {
+        super.checkExit(status)
+        throw new SecurityException(s"System.exit($status)")
+      }
+    })
+    try block
+    finally System.setSecurityManager(originalManager)
   }
 }
