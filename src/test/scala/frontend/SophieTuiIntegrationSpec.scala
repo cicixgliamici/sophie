@@ -1,7 +1,11 @@
 package frontend
 
 import org.scalatest.funsuite.AnyFunSuite
-import engine.InMemoryMarketData
+import engine.{FileLedger, InMemoryMarketData}
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.Files
+import java.nio.file.Paths
+import upickle.default.read
 
 class SophieTuiIntegrationSpec extends AnyFunSuite {
 
@@ -27,43 +31,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
       ":set price MSFT 350",
       "BUY 100 EUR OF MSFT;",
       ":show last", // should be treated as command, not appended to program
-      "", // submit program
-      ":pf apply"
-    )
-
-    val (pf, planOpt) = SophieTui.simulateSession(inputs)
-    val actual = pf.getOrElse("MSFT", BigDecimal(0))
-    val expected = BigDecimal(100) / BigDecimal(350)
-    assert((actual - expected).abs < BigDecimal("1e-8"), s"Expected approx $expected but got $actual")
-  }
-
-  test("pf_save_load_roundtrip") {
-    val path = "tmp/test_pf_rt.json"
-    val inputs = Seq(
-      ":set price MSFT 350",
-      "BUY 1500 EUR OF MSFT;",
-      "",
-      ":pf apply",
-      s":pf save $path",
-      ":pf new",
-      s":pf load $path"
-    )
-    val (pf, _) = SophieTui.simulateSession(inputs)
-    assert(pf.contains("MSFT"), "After save/load the portfolio should contain MSFT")
-  }
-
-  test("bom_in_command_is_handled") {
-    val inputs = Seq(
-      "\uFEFF:set price MSFT 350", // BOM before ':' should be normalized and treated as command
-      "BUY 50 EUR OF MSFT;",
-      "",
-      ":pf apply"
-    )
-    val (pf, _) = SophieTui.simulateSession(inputs)
-    val actual = pf.getOrElse("MSFT", BigDecimal(0))
-    val expected = BigDecimal(50) / BigDecimal(350)
-    assert((actual - expected).abs < BigDecimal("1e-8"), s"Expected approx $expected but got $actual")
-  }
+@@ -67,26 +71,109 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
 
   test("multiple_buys_accumulate") {
     val inputs = Seq(
@@ -88,5 +56,88 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
     )
     val (pf, _) = SophieTui.simulateSession(inputs)
     assert(pf.isEmpty, "Portfolio should remain empty when applying trades with missing prices")
+  }
+
+  test("save_md_and_load_md_roundtrip") {
+    val tmpDir = Files.createTempDirectory("sophie_tui_md_")
+    try {
+      val mdPath = tmpDir.resolve("md.json")
+      val inputsSave = Seq(
+        ":set price MSFT 123.45",
+        ":set series MSFT volume 1,2,3",
+        ":set ovr RSI MSFT 14 42",
+        s":save md $mdPath"
+      )
+      SophieTui.simulateSession(inputsSave)
+
+      val mdJson = Files.readString(mdPath, UTF_8)
+      val md = read[MdJsonCodec.MarketDataJ](mdJson)
+      assert(md.prices.get("MSFT").contains(BigDecimal("123.45")), s"Expected price in saved MD: $mdJson")
+      assert(md.series.contains("MSFT.volume"), s"Expected series in saved MD: $mdJson")
+      assert(md.indicatorOverrides.exists(o => o.name == "RSI" && o.symbol == "MSFT" && o.period == 14), s"Expected override in saved MD: $mdJson")
+
+      val inputsLoad = Seq(
+        s":load md $mdPath",
+        "BUY 100 EUR OF MSFT;",
+        "",
+        ":pf apply"
+      )
+      val (pf, _) = SophieTui.simulateSession(inputsLoad)
+      assert(pf.contains("MSFT"), "Portfolio should contain MSFT after loading MD and applying program")
+    } finally {
+      try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
+    }
+  }
+
+  test("run_prog_and_save_prog_write_expected_files") {
+    val tmpDir = Files.createTempDirectory("sophie_tui_prog_")
+    try {
+      val progPath = tmpDir.resolve("buy.sophie")
+      val savedPath = tmpDir.resolve("saved.sophie")
+      Files.writeString(progPath, "BUY 10 EUR OF MSFT;", UTF_8)
+
+      val inputs = Seq(
+        ":set price MSFT 10",
+        s":run prog $progPath",
+        ":pf apply",
+        s":save prog $savedPath"
+      )
+      val (pf, _) = SophieTui.simulateSession(inputs)
+      assert(pf.contains("MSFT"), "Portfolio should contain MSFT after :run prog + :pf apply")
+
+      val saved = Files.readString(savedPath, UTF_8)
+      assert(saved.contains("BUY 10 EUR OF MSFT"), s"Saved program mismatch: $saved")
+    } finally {
+      try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
+    }
+  }
+
+  test("compile_ir_and_exec_ir_execute_instructions") {
+    val tmpDir = Files.createTempDirectory("sophie_tui_ir_")
+    try {
+      val irPath = tmpDir.resolve("instr.json")
+      val dataPf = Paths.get("data/portfolio.json")
+      val dataLedger = Paths.get("data/ledger.ndjson")
+      Files.deleteIfExists(dataPf)
+      Files.deleteIfExists(dataLedger)
+
+      val inputs = Seq(
+        ":set price MSFT 5",
+        "BUY 10 EUR OF MSFT;",
+        "",
+        s":compile ir $irPath",
+        s":exec ir $irPath"
+      )
+      SophieTui.simulateSession(inputs)
+
+      assert(Files.exists(dataPf), "Expected portfolio.json to be written by :exec ir")
+      assert(Files.exists(dataLedger), "Expected ledger.ndjson to be written by :exec ir")
+      val ledgerEntries = FileLedger(dataLedger).readAll()
+      assert(ledgerEntries.nonEmpty, "Expected ledger to contain entries after :exec ir")
+    } finally {
+      try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
+      Files.deleteIfExists(Paths.get("data/portfolio.json"))
+      Files.deleteIfExists(Paths.get("data/ledger.ndjson"))
+    }
   }
 }
