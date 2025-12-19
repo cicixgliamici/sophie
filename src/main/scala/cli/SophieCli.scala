@@ -11,6 +11,7 @@ import frontend.PortfolioJson._
 import engine.{InMemoryMarketData, Lowering, Executor, FileLedger, FileJsonPortfolioStore}
 import engine._
 import frontend.ReceiptPrinter
+import util.SLF4JLogger
 
 /**
   * Sophie CLI
@@ -51,101 +52,105 @@ object SophieCli {
     val config = if (implicitRun)
       rawConfig.copy(execute = true)
     else rawConfig
-    if (config.showHelp) { printHelp(); return }
+    if (config.showHelp) {
+      printHelp()
+    } else {
+      try {
+        // 1) Load program
+        val program = config.sophieFile match {
+          case Some(p) => SophieParserFacade.parseFile(p)
+          case None    =>
+            SLF4JLogger.error("No input file provided. Use --file <path> or --demo for the sample in resources.")
+            sys.exit(2)
+            throw new IllegalStateException("unreachable")
+        }
 
-    try {
-      // 1) Load program
-      val program = config.sophieFile match {
-        case Some(p) => SophieParserFacade.parseFile(p)
-        case None    =>
-          System.err.println("No input file provided. Use --file <path> or --demo for the sample in resources.")
-          sys.exit(2)
-      }
+        // Confirm if implicit run
+        val proceed = if (implicitRun) {
+          Console.err.print("Esegui il programma e scrivi ledger/portfolio? [y/N]: ")
+          val ans = scala.io.StdIn.readLine().trim.toLowerCase
+          ans == "y" || ans == "yes"
+        } else true
 
-      // Confirm if implicit run
-      if (implicitRun) {
-        Console.err.print("Esegui il programma e scrivi ledger/portfolio? [y/N]: ")
-        val ans = scala.io.StdIn.readLine().trim.toLowerCase
-        if (ans != "y" && ans != "yes") {
+        if (!proceed) {
           println("Execution cancelled by user.")
-          return
-        }
-      }
+        } else {
 
-      // 2) Load market data (either provided JSON or demo bundled)
-      val md: InMemoryMarketData = config.mdFile match {
-        case Some(mdPath) => loadMdFromFile(mdPath)
-        case None => loadDemoMd().getOrElse {
-          System.err.println("No demo market data found")
-          sys.exit(2)
-          throw new IllegalStateException("unreachable")
-        }
-      }
-
-      // 3) Evaluate program
-      val plan = engine.Evaluator.evaluate(program, md)
-
-      // Print a readable plan
-      println("=== Execution Plan ===")
-      plan.trades.foreach { d =>
-        val status = if (d.shouldExecute) "EXECUTE" else "SKIP"
-        println(s" - [$status] ${d.detail}")
-      }
-      plan.portfolio.foreach { p =>
-        println(" - [PORTFOLIO] target allocations:")
-        p.allocations.foreach { a => println(s"   * ${a.value.amount} ${a.value.currency} OF ${a.symbol}") }
-      }
-
-      // 4) Optionally print instructions
-      if (config.printInstructions) {
-        Lowering.from(plan, md, config.source) match {
-          case Left(err) =>
-            System.err.println(s"Error lowering to instructions: $err")
-          case Right(inst) =>
-            println("\n=== Instructions (JSON) ===")
-            println(write(inst, indent = 2))
-        }
-      }
-
-      // 5) Optionally execute
-      if (config.execute) {
-        Lowering.from(plan, md, config.source) match {
-          case Left(err) =>
-            System.err.println(s"Error lowering to instructions: $err")
-            System.exit(1)
-          case Right(inst) =>
-            val ledgerPath = config.ledgerPath.getOrElse(Paths.get("ledger.ndjson"))
-            val portfolioPath = config.portfolioPath.getOrElse(Paths.get("portfolio.json"))
-
-            // If the portfolio file already exists, ask the user whether to reset it unless --reset-portfolio is provided
-            if (Files.exists(portfolioPath) && !config.resetPortfolio) {
-              Console.err.print(s"Portfolio file $portfolioPath esiste. Vuoi eliminarlo e iniziare da zero? [y/N]: ")
-              val ans = scala.io.StdIn.readLine().trim.toLowerCase
-              if (ans == "y" || ans == "yes") {
-                resetPortfolioFile(portfolioPath)
-                println(s"Portfolio $portfolioPath resettato.")
-              } else {
-                println(s"Mantengo il portfolio esistente: $portfolioPath")
-              }
-            } else if (Files.exists(portfolioPath) && config.resetPortfolio) {
-              resetPortfolioFile(portfolioPath)
-              println(s"Portfolio $portfolioPath resettato (--reset-portfolio).")
+          // 2) Load market data (either provided JSON or demo bundled)
+          val md: InMemoryMarketData = config.mdFile match {
+            case Some(mdPath) => loadMdFromFile(mdPath)
+            case None => loadDemoMd().getOrElse {
+              SLF4JLogger.error("No demo market data found")
+              sys.exit(2)
+              throw new IllegalStateException("unreachable")
             }
+          }
 
-            val ledger = FileLedger(ledgerPath)
-            val pfStore = FileJsonPortfolioStore(portfolioPath)
-            val events = Executor.run(inst, md, pfStore, ledger, config.source)
-            println(s"Executed ${inst.length} instructions; ledger -> $ledgerPath, portfolio -> $portfolioPath")
-            val receiptPath = config.receiptFile.map(Paths.get(_))
-            ReceiptPrinter.printReceipts(events, receiptPath)
+          // 3) Evaluate program
+          val plan = engine.Evaluator.evaluate(program, md)
+
+          // Print a readable plan
+          println("=== Execution Plan ===")
+          plan.trades.foreach { d =>
+            val status = if (d.shouldExecute) "EXECUTE" else "SKIP"
+            println(s" - [$status] ${d.detail}")
+          }
+          plan.portfolio.foreach { p =>
+            println(" - [PORTFOLIO] target allocations:")
+            p.allocations.foreach { a => println(s"   * ${a.value.amount} ${a.value.currency} OF ${a.symbol}") }
+          }
+
+          // 4) Optionally print instructions
+          if (config.printInstructions) {
+            Lowering.from(plan, md, config.source) match {
+              case Left(err) => SLF4JLogger.error(s"Error lowering to instructions: $err")
+              case Right(inst) =>
+                println("\n=== Instructions (JSON) ===")
+                println(write(inst, indent = 2))
+            }
+          }
+
+          // 5) Optionally execute
+          if (config.execute) {
+            Lowering.from(plan, md, config.source) match {
+              case Left(err) =>
+                SLF4JLogger.error(s"Error lowering to instructions: $err")
+                System.exit(1)
+              case Right(inst) =>
+                val ledgerPath = config.ledgerPath.getOrElse(Paths.get("ledger.ndjson"))
+                val portfolioPath = config.portfolioPath.getOrElse(Paths.get("portfolio.json"))
+
+                // If the portfolio file already exists, ask the user whether to reset it unless --reset-portfolio is provided
+                if (Files.exists(portfolioPath) && !config.resetPortfolio) {
+                  Console.err.print(s"Portfolio file $portfolioPath esiste. Vuoi eliminarlo e iniziare da zero? [y/N]: ")
+                  val ans = scala.io.StdIn.readLine().trim.toLowerCase
+                  if (ans == "y" || ans == "yes") {
+                    resetPortfolioFile(portfolioPath)
+                    println(s"Portfolio $portfolioPath resettato.")
+                  } else {
+                    println(s"Mantengo il portfolio esistente: $portfolioPath")
+                  }
+                } else if (Files.exists(portfolioPath) && config.resetPortfolio) {
+                  resetPortfolioFile(portfolioPath)
+                  println(s"Portfolio $portfolioPath resettato (--reset-portfolio).")
+                }
+
+                val ledger = FileLedger(ledgerPath)
+                val pfStore = FileJsonPortfolioStore(portfolioPath)
+                val events = Executor.run(inst, md, pfStore, ledger, config.source)
+                println(s"Executed ${inst.length} instructions; ledger -> $ledgerPath, portfolio -> $portfolioPath")
+                val receiptPath = config.receiptFile.map(Paths.get(_))
+                ReceiptPrinter.printReceipts(events, receiptPath)
+            }
+          }
+
         }
-      }
 
-    } catch {
-      case ex: Throwable =>
-        System.err.println(s"Error: ${ex.getMessage}")
-        ex.printStackTrace()
-        System.exit(1)
+      } catch {
+        case ex: Throwable =>
+          SLF4JLogger.error(s"Error: ${ex.getMessage}", ex)
+          System.exit(1)
+      }
     }
   }
 
@@ -177,7 +182,7 @@ object SophieCli {
       case "--source" :: s :: t => go(t, acc.copy(source = s))
       case "--reset-portfolio" :: t => go(t, acc.copy(resetPortfolio = true))
       case opt :: _ =>
-        System.err.println(s"Unknown option or missing argument: $opt")
+        SLF4JLogger.error(s"Unknown option or missing argument: $opt")
         acc.copy(showHelp = true)
     }
     go(args, Config())
@@ -227,7 +232,7 @@ object SophieCli {
       val emptyPf = PortfolioJ(positions = Map.empty[String, BigDecimal], cash = Some(BigDecimal(0)))
       val empty = upickle.default.write(emptyPf, indent = 2)
       Files.writeString(p, empty)
-    } catch { case e: Exception => System.err.println(s"Error resetting portfolio file: ${e.getMessage}") }
+    } catch { case e: Exception => SLF4JLogger.error(s"Error resetting portfolio file: ${e.getMessage}") }
   }
 
 }

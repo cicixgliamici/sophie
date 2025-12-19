@@ -65,9 +65,9 @@ object SophieAstBuilder {
     * Dispatches to the appropriate handler based on the statement type.
     */
   private def fromStatement(ctx: StatementContext): Statement = {
-    if (ctx.trade_cmd() != null) fromTrade(ctx.trade_cmd())
-    else if (ctx.portfolio_cmd() != null) fromPortfolio(ctx.portfolio_cmd())
-    else throw new IllegalArgumentException("Unknown statement type")
+    Option(ctx.trade_cmd()).map(fromTrade)
+      .orElse(Option(ctx.portfolio_cmd()).map(fromPortfolio))
+      .getOrElse(throw new IllegalArgumentException("Unknown statement type"))
   }
 
   // ---------- Trade ----------
@@ -76,10 +76,9 @@ object SophieAstBuilder {
     * Handles BUY/SELL actions, value, symbol, and the required condition.
     */
   private def fromTrade(ctx: Trade_cmdContext): TradeCmd = {
-    val action =
-      if (ctx.BUY() != null) Buy
-      else if (ctx.SELL() != null) Sell
-      else throw new IllegalArgumentException("Missing BUY/SELL")
+    val action = Option(ctx.BUY()).map(_ => Buy)
+      .orElse(Option(ctx.SELL()).map(_ => Sell))
+      .getOrElse(throw new IllegalArgumentException("Missing BUY/SELL"))
 
     // The grammar now wraps value/quantity into a `consideration` rule. Use that.
     // Explanation (educational): the parser does not expose a single `value`
@@ -103,17 +102,16 @@ object SophieAstBuilder {
     //    interleave with parsing logic, making unit testing harder.
     val cons = ctx.consideration()
     val sym = symbolText(ctx.symbol())
-    val v =
-      if (cons.value() != null) fromValue(cons.value())
-      else if (cons.quantity() != null) {
-        // Quantity is specified as `QTY <NUMBER>`; treat it as a Value with currency == symbol
-        val num = firstTokenOf(cons.quantity(), sophieParser.NUMBER)
-        Value(BigDecimal(num), sym)
-      } else throw new IllegalArgumentException("Missing consideration (value or quantity)")
 
-    val cond =
-      if (ctx.condition() != null) fromCondition(ctx.condition())
-      else AlwaysTrue
+    val v = Option(cons.value()).map(fromValue)
+      .orElse(Option(cons.quantity()).map { q =>
+        // Quantity is specified as `QTY <NUMBER>`; treat it as a Value with currency == symbol
+        val num = firstTokenOf(q, sophieParser.NUMBER)
+        Value(BigDecimal(num), sym)
+      })
+      .getOrElse(throw new IllegalArgumentException("Missing consideration (value or quantity)"))
+
+    val cond = Option(ctx.condition()).map(fromCondition).getOrElse(AlwaysTrue)
 
     TradeCmd(action = action, value = v, symbol = sym, condition = cond)
   }
@@ -124,14 +122,10 @@ object SophieAstBuilder {
     * Expects an allocation list and maps each allocation.
     */
   private def fromPortfolio(ctx: Portfolio_cmdContext): PortfolioCmd = {
-    val list = ctx.allocation_list()
-    if (list == null)
-      throw new IllegalArgumentException("PORTFOLIO must have an allocation list")
-
-    // After regenerating the grammar, allocation_list() is guaranteed to exist.
-    val allocs = list.allocation().asScala.toList.map(fromAllocation)
-
-    PortfolioCmd(allocs)
+    Option(ctx.allocation_list()).map { list =>
+      val allocs = list.allocation().asScala.toList.map(fromAllocation)
+      PortfolioCmd(allocs)
+    }.getOrElse(throw new IllegalArgumentException("PORTFOLIO must have an allocation list"))
   }
 
   /**
@@ -164,8 +158,7 @@ object SophieAstBuilder {
     * Converts a ConditionContext into an AST Condition.
     * Handles logical OR (disjunction) at the top level.
     */
-  private def fromCondition(ctx: ConditionContext): Condition =
-    fromDisjunction(ctx.disjunction())
+  private def fromCondition(ctx: ConditionContext): Condition = fromDisjunction(ctx.disjunction())
 
   /**
     * Handles disjunctions (OR chains) in conditions.
@@ -179,10 +172,9 @@ object SophieAstBuilder {
     * Handles conjunctions (AND chains) and parenthesized conditions.
     */
   private def fromConjunction(ctx: ConjunctionContext): Condition = {
-    val left: Condition =
-      if (ctx.comparison() != null) fromComparison(ctx.comparison())
-      else if (ctx.condition() != null) Parens(fromCondition(ctx.condition()))
-      else throw new IllegalArgumentException("Invalid conjunction")
+    val left: Condition = Option(ctx.comparison()).map(fromComparison)
+      .orElse(Option(ctx.condition()).map(c => Parens(fromCondition(c))))
+      .getOrElse(throw new IllegalArgumentException("Invalid conjunction"))
 
     if (ctx.AND() != null && ctx.conjunction() != null) And(left, fromConjunction(ctx.conjunction()))
     else left
@@ -195,9 +187,7 @@ object SophieAstBuilder {
   private def fromComparison(ctx: ComparisonContext): Condition = {
     val exprs = ctx.expr().asScala.toList
     exprs match {
-      case List(single) =>
-        // Truthy: treat as "expr != 0"
-        Comparison(fromExpr(single), CmpNEQ, NumberLiteral(0))
+      case List(single) => Comparison(fromExpr(single), CmpNEQ, NumberLiteral(0))
       case List(l, r) =>
         // Binary comparison: extract operator and operands
         val opTok = firstOpToken(ctx, Set(sophieParser.GT, sophieParser.LT, sophieParser.EQ, sophieParser.NEQ))
@@ -209,8 +199,7 @@ object SophieAstBuilder {
           case other            => throw new IllegalArgumentException(s"Unexpected comparison op token: $other")
         }
         Comparison(fromExpr(l), op, fromExpr(r))
-      case _ =>
-        throw new IllegalArgumentException("comparison must have one or two expr children")
+      case _ => throw new IllegalArgumentException("comparison must have one or two expr children")
     }
   }
 
@@ -260,14 +249,14 @@ object SophieAstBuilder {
     * Handles price expressions, series operations, parenthesized expressions, and number literals.
     */
   private def fromPrimary(ctx: PrimaryContext): Operand = {
-    if (ctx.price_expr() != null) fromPrice(ctx.price_expr())
-    else if (ctx.series_operation() != null) fromSeriesOp(ctx.series_operation())
-    else if (ctx.expr() != null) fromExpr(ctx.expr())
-    else {
-      // Fallback: must be a number literal
-      val t = firstTokenNode(ctx, sophieParser.NUMBER)
-      NumberLiteral(BigDecimal(t.getText))
-    }
+    Option(ctx.price_expr()).map(fromPrice)
+      .orElse(Option(ctx.series_operation()).map(fromSeriesOp))
+      .orElse(Option(ctx.expr()).map(fromExpr))
+      .getOrElse {
+        // Fallback: must be a number literal
+        val t = firstTokenNode(ctx, sophieParser.NUMBER)
+        NumberLiteral(BigDecimal(t.getText))
+      }
   }
 
   // ---------- Series & PRICE ----------
@@ -276,11 +265,11 @@ object SophieAstBuilder {
     * Handles both field access (e.g., symbol.field) and aggregation functions (e.g., SMA(symbol, n)).
     */
   private def fromSeriesOp(ctx: Series_operationContext): Operand = {
-    if (ctx.series_field() != null) {
+    Option(ctx.series_field()).map(_ => {
       val sym = symbolText(ctx.symbol())
       val field = ctx.series_field().getText
       SeriesOperation(sym, field)
-    } else {
+    }).getOrElse {
       val name = ctx.agg_func().getText
       val sym  = symbolText(ctx.symbol())
       val per  = BigDecimal(firstTokenOf(ctx, sophieParser.NUMBER))
@@ -291,25 +280,20 @@ object SophieAstBuilder {
   /**
     * Converts a Price_exprContext into a Price AST node.
     */
-  private def fromPrice(ctx: Price_exprContext): Operand =
-    Price(symbolText(ctx.symbol()))
+  private def fromPrice(ctx: Price_exprContext): Operand = Price(symbolText(ctx.symbol()))
 
   // ---------- Helpers ----------
   /**
     * Folds a list of (operator, operand) pairs into a left-associative binary tree.
     * Used for arithmetic expressions.
     */
-  private def foldLeftArith(head: Operand, tail: List[(ArithOp, Operand)]): Operand =
-    tail.foldLeft(head) { case (acc, (op, right)) => Binary(op, acc, right) }
+  private def foldLeftArith(head: Operand, tail: List[(ArithOp, Operand)]): Operand = tail.foldLeft(head) { case (acc, (op, right)) => Binary(op, acc, right) }
 
   /**
     * Reduces a list of conditions using the provided constructor (e.g., Or, And).
     * Throws if the list is empty.
     */
-  private def reduceLeft(parts: List[Condition], ctor: (Condition, Condition) => Condition): Condition =
-    parts.reduceLeftOption(ctor).getOrElse(
-      throw new IllegalArgumentException("Empty boolean chain")
-    )
+  private def reduceLeft(parts: List[Condition], ctor: (Condition, Condition) => Condition): Condition = parts.reduceLeftOption(ctor).getOrElse(throw new IllegalArgumentException("Empty boolean chain"))
 
   /**
     * Finds the first TerminalNode of the given token type in the context's children.
@@ -327,8 +311,7 @@ object SophieAstBuilder {
   /**
     * Returns the text of the first token of the given type in the context.
     */
-  private def firstTokenOf(ctx: org.antlr.v4.runtime.RuleContext, tokenType: Int): String =
-    firstTokenNode(ctx, tokenType).getText
+  private def firstTokenOf(ctx: org.antlr.v4.runtime.RuleContext, tokenType: Int): String = firstTokenNode(ctx, tokenType).getText
 
   /**
     * Finds the first operator token (from the allowed set) in the context's children.

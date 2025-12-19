@@ -73,8 +73,7 @@ class PortfolioManager() {
   def save(state: PortfolioState, path: String): Vector[String] = {
     try {
       val p = Paths.get(path)
-      val parent = p.getParent
-      if (parent != null && !Files.exists(parent)) Files.createDirectories(parent)
+      Option(p.getParent).foreach(parent => if (!Files.exists(parent)) Files.createDirectories(parent))
       val json = write(PortfolioJson.PortfolioJ(state.positions.filter(_._2 > 0), Some(state.cash)), indent = 2)
       Files.writeString(p, json, UTF_8)
       Vector(s"Saved portfolio to $path")

@@ -65,7 +65,7 @@ object SophieTui {
   private lazy val commandHandler: CommandHandler = new CommandHandler(actions, portfolioManager)
 
   def run(): Unit = {
-    println("Sophie TUI - type :help for commands. Paste DSL, blank line to run.")
+    printer.printlnLine("Sophie TUI - type :help for commands. Paste DSL, blank line to run.")
 
     @tailrec
     def loop(session: SessionState, portfolio: PortfolioState, buf: PasteBuffer): Unit = {
@@ -74,7 +74,7 @@ object SophieTui {
       val line   = normalizeForCommand(raw)
 
       (line, raw) match {
-        case (null, _) => println("Bye.")
+        case (null, _) => printer.printlnLine("Bye.")
         case (l, _) if l.isEmpty && buf.nonEmpty =>
           val (nextSession, log) = evalAndCollect(buf.result, session)
           log.foreach(printer.printlnLine)
@@ -82,11 +82,11 @@ object SophieTui {
         case (l, _) if l != null && l.startsWith(":") =>
           val result = commandHandler.handle(l, session, portfolio, buf)
           result.log.foreach(printer.printlnLine)
-          if (result.continue) loop(result.session, result.portfolio, result.buffer) else println("Bye.")
+          if (result.continue) loop(result.session, result.portfolio, result.buffer) else printer.printlnLine("Bye.")
         case (_, r) if r != null =>
           // appendiamo la riga *come è stata inserita* nel buffer (preserviamo eventuali spazi interni)
           loop(session, portfolio, buf.append(r))
-        case _ => println("Bye.")
+        case _ => printer.printlnLine("Bye.")
       }
     }
 
@@ -297,8 +297,7 @@ object SophieTui {
 
   private def ensureParentDir(path: String): Unit = {
     val p = Paths.get(path)
-    val parent = p.getParent
-    if (parent != null && !Files.exists(parent)) Files.createDirectories(parent)
+    Option(p.getParent).foreach(parent => if (!Files.exists(parent)) Files.createDirectories(parent))
   }
 
   /**

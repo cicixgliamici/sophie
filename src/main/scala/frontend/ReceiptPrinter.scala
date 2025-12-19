@@ -13,64 +13,65 @@ object ReceiptPrinter {
   private val fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME.withZone(ZoneId.systemDefault())
 
   /**
-    * Print human-friendly receipts for executed ledger events and optionally
-    * append them to a file.
-    *
-    * Notes:
-    *  - This component is intentionally IO-bound: printing and optionally
-    *    persisting receipts is a side-effect. The rest of the engine produces
-    *    the `LedgerEvent` list (pure), so we can test printing separately.
-    *  - The formatting code computes column widths dynamically to produce a
-    *    readable table regardless of the numeric widths.
+    * Produce le linee della ricevuta come valore puro (nessun effetto).
+    * Questo rende facile testare il formatting senza side-effects.
     */
-  def printReceipts(events: List[LedgerEvent], saveTo: Option[Path] = None): Unit = {
-    if (events.isEmpty) return
+  def receiptLines(events: List[LedgerEvent]): Vector[String] = {
+    if (events.isEmpty) Vector.empty
+    else {
+      def s(v: BigDecimal): String = v.bigDecimal.stripTrailingZeros.toPlainString
+      val rows = events.map { e =>
+        val action = e.action match { case ast.Buy => "Comprato"; case ast.Sell => "Venduto" }
+        val qty = s(e.qty)
+        val price = s(e.price)
+        val total = s(e.notional)
+        val when = fmt.format(Instant.ofEpochMilli(e.ts))
+        (action, e.symbol, qty, price, total, when)
+      }
 
-    // Calcola larghezze colonne per allineamento
-    def s(v: BigDecimal): String = v.bigDecimal.stripTrailingZeros.toPlainString
-    val rows = events.map { e =>
-      val action = e.action match { case ast.Buy => "Comprato"; case ast.Sell => "Venduto" }
-      val qty = s(e.qty)
-      val price = s(e.price)
-      val total = s(e.notional)
-      val when = fmt.format(Instant.ofEpochMilli(e.ts))
-      (action, e.symbol, qty, price, total, when)
+      val actionW = (rows.map(_._1.length) :+ "Azione".length).max
+      val symW    = (rows.map(_._2.length) :+ "Simbolo".length).max
+      val qtyW    = (rows.map(_._3.length) :+ "Quantità".length).max
+      val pxW     = (rows.map(_._4.length) :+ "Prezzo".length).max
+      val totW    = (rows.map(_._5.length) :+ "Totale".length).max
+
+      val lineFmt = s"%-${actionW}s  %-${symW}s  %${qtyW}s  %${pxW}s  %${totW}s  %s"
+
+      val header = lineFmt.format("Azione","Simbolo","Quantità","Prezzo","Totale","Ora")
+
+      val bodyLines = rows.map { case (action, symbol, qty, price, total, when) =>
+        lineFmt.format(action, symbol, qty, price, total, when)
+      }
+
+      Vector("\n=== Ricevuta ordini eseguiti ===", header) ++ bodyLines :+ ""
     }
+  }
 
-    val actionW = (rows.map(_._1.length) :+ "Azione".length).max
-    val symW    = (rows.map(_._2.length) :+ "Simbolo".length).max
-    val qtyW    = (rows.map(_._3.length) :+ "Quantità".length).max
-    val pxW     = (rows.map(_._4.length) :+ "Prezzo".length).max
-    val totW    = (rows.map(_._5.length) :+ "Totale".length).max
+  /**
+    * Stampa le linee della ricevuta e opzionalmente le persiste su file.
+    * Si accetta un `TuiPrinter` per centralizzare/astrarre l'I/O (default: Console).
+    */
+  def printReceipts(events: List[LedgerEvent], saveTo: Option[Path] = None, printer: TuiPrinter = DefaultPrinter): Unit = {
+    val lines = receiptLines(events)
+    if (lines.nonEmpty) {
+      // Print to provided printer
+      lines.foreach(printer.printlnLine)
 
-    // Costruisce una stringa di formato dinamica corretta (senza spazi errati dopo '%-')
-    val lineFmt = s"%-${actionW}s  %-${symW}s  %${qtyW}s  %${pxW}s  %${totW}s  %s"
-
-    val header = lineFmt.format("Azione","Simbolo","Quantità","Prezzo","Totale","Ora")
-
-    val bodyLines = rows.map { case (action, symbol, qty, price, total, when) =>
-      lineFmt.format(action, symbol, qty, price, total, when)
-    }
-
-    // Print to stdout
-    println("\n=== Ricevuta ordini eseguiti ===")
-    println(header)
-    bodyLines.foreach(println)
-    println()
-
-    // Optionally append to file
-    saveTo.foreach { path =>
-      try {
-        val all = (Seq(header) ++ bodyLines).mkString("\n") + "\n"
-        if (!Files.exists(path)) {
+      // Optionally append to file (side-effect kept in this boundary)
+      saveTo.foreach { path =>
+        try {
+          val all = lines.mkString("\n") + "\n"
           val parent = path.getParent
           if (parent != null && !Files.exists(parent)) Files.createDirectories(parent)
-          Files.writeString(path, all, UTF_8, StandardOpenOption.CREATE)
-        } else {
-          Files.writeString(path, all, UTF_8, StandardOpenOption.APPEND)
+          if (!Files.exists(path)) {
+            Files.writeString(path, all, UTF_8, StandardOpenOption.CREATE)
+          } else {
+            Files.writeString(path, all, UTF_8, StandardOpenOption.APPEND)
+          }
+        } catch { case e: Exception =>
+          // Use the provided printer to report warnings so tests can capture output
+          printer.printlnLine(s"Warning: unable to write receipts to ${path.toString}: ${e.getMessage}")
         }
-      } catch { case e: Exception =>
-        System.err.println(s"Warning: unable to write receipts to ${path.toString}: ${e.getMessage}")
       }
     }
   }

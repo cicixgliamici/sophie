@@ -67,9 +67,9 @@ final case class FileLedger(path: Path) extends Ledger {
     * @return A vector of all events in the ledger.
     */
   override def readAll(): Vector[LedgerEvent] = {
-    if (!Files.exists(path)) return Vector.empty
     import scala.jdk.CollectionConverters._
-    Files.readAllLines(path, UTF_8).asScala
+    if (!Files.exists(path)) Vector.empty
+    else Files.readAllLines(path, UTF_8).asScala
       .filter(_.trim.nonEmpty).toVector.map(s => read[LedgerEvent](s))
   }
 }

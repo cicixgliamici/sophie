@@ -33,6 +33,9 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % Test
 
 libraryDependencies += "com.lihaoyi" %% "upickle" % "3.1.2"
 
+// Logging: SLF4J API + Logback implementation
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.11"
+
 // ==============================
 // assembly (fat JAR) settings
 // ==============================
