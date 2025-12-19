@@ -116,9 +116,7 @@ This matches the documented flow: **Parse → Evaluate → Lower → Execute** (
 
 ## 4) Functional vs. Imperative vs. OOP
 
-# Sophie Codebase Report — Functional Programming Deep Dive (English)
-
-## 1) Executive Summary (Functional Orientation)
+### Executive Summary (Functional Orientation)
 
 The codebase is predominantly **functional in the core** (AST, evaluation, lowering, pure transformations) and **imperative at the boundaries** (CLI/TUI I/O, persistence, execution).
 
@@ -143,7 +141,7 @@ Sources:
 
 ---
 
-## 2) Quantitative Indicators (Functional vs Imperative)
+### Quantitative Indicators (Functional vs Imperative)
 
 ### 2.1 `val` vs `var`
 
@@ -182,7 +180,7 @@ Interpretation: Tail recursion is used for the TUI REPL loops, while explicit `w
 
 ---
 
-## 3) Functional Programming Features Present
+### Functional Programming Features Present
 
 ### 3.1 Immutable data modeling (Algebraic Data Types)
 
@@ -228,7 +226,7 @@ Sources:
 
 ---
 
-## 4) Where Functional Programming Is Missing or Weaker
+### Where Functional Programming Is Missing or Weaker
 
 ### 4.1 Lack of a dedicated validation/effect system
 
@@ -261,7 +259,7 @@ Sources:
 
 ---
 
-## 5) Statelessness — Where It’s Strong
+### Statelessness — Where It’s Strong
 
 The project explicitly documents and implements stateless transformations:
 
@@ -410,7 +408,25 @@ Sources:
 - `src/main/antlr4/sophie.g4`
 - `docs/language_overview.txt`
 
-### 2.5 Functional evaluation model
+### 2.5 Truthiness, quantities, and market data semantics
 
+- **Truthy comparisons:** a comparison with a single expression is interpreted as “expression != 0” in the AST builder. This means `IF RSI(MSFT,14)` is treated as `RSI(MSFT,14) != 0`.  
+  Source: `src/main/scala/ast/SophieAstBuilder.scala`
+- **Quantity vs. value:** `QTY n` represents an explicit quantity. The AST builder normalizes this to a `Value` where `currency == symbol`, so downstream logic can interpret it as a direct quantity and skip FX conversion.  
+  Sources: `src/main/antlr4/sophie.g4`, `src/main/scala/ast/SophieAstBuilder.scala`
+- **Indicator overrides:** market data supports explicit indicator overrides (useful for tests and demos), which are used before computing indicators from series.  
+  Source: `src/main/scala/engine/MarketData.scala`
+
+### 2.6 Functional evaluation model
 The language is interpreted by transforming syntax into a typed AST and then evaluating it into a pure execution plan (no side effects during evaluation).  
 Source: `docs/language_overview.txt`
+
+### 2.7 Persistence formats (execution semantics)
+
+While not part of the grammar, the language’s execution semantics are tied to file formats:
+- **Portfolio** state is persisted as JSON (`positions` map, optional `cash`) using `PortfolioJ`.
+- **Ledger** is persisted as NDJSON (one event per line).
+This impacts how executions are replayed or audited.
+Sources:
+- `docs/storage_and_persistence.md`
+- `src/main/scala/engine/Ledger.scala`
