@@ -110,6 +110,32 @@ class SophieCliIntegrationSpec extends AnyFunSuite {
       try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
     }
   }
+ test("CLI reports an error when the market data file is missing") {
+    val tmpDir = Files.createTempDirectory("sophie_cli_missing_md_")
+    try {
+      val portfolioPath = tmpDir.resolve("out_pf.json")
+      val ledgerPath = tmpDir.resolve("out_ledger.ndjson")
+      val missingMd = tmpDir.resolve("missing_md.json")
+
+      val args = Array(
+        "--file", "src/test/resources/programs/buy_ok.sophie",
+        "--md", missingMd.toString,
+        "--run",
+        "--portfolio", portfolioPath.toString,
+        "--ledger", ledgerPath.toString,
+        "--reset-portfolio"
+      )
+
+      val ex = intercept[SecurityException] {
+        withNoExit {
+          cli.SophieCli.main(args)
+        }
+      }
+      assert(ex.getMessage.contains("System.exit"), s"Expected System.exit when md missing, got: ${ex.getMessage}")
+    } finally {
+      try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
+    }
+  }
 
   private def withNoExit[A](block: => A): A = {
     val originalManager = System.getSecurityManager
