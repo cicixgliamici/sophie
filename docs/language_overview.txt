@@ -15,16 +15,29 @@ Language surface
   - Indicators such as MAVG/EMA/STDDEV/RSI over closes via INDICATOR(name, symbol, period).
   - Arithmetic Binary expressions with +, -, *, / (division keeps scale and guards against /0).
 
-Runtime layers 
+Runtime layers
 -------------------------------------
-1) Parsing: SophieParserFacade wraps the ANTLR-generated lexer/parser and turns source text into a parse tree. SophieAstBuilder converts the tree into the typed AST used everywhere else.
-2) Evaluation: engine.Evaluator walks the AST against MarketData, deciding which trades should execute and capturing portfolio targets. Indicator computations live in engine.Indicators.
-3) Lowering: engine.Lowering transforms the ExecutionPlan into concrete Instruction objects (JSON-ready), resolving money-to-quantity conversions with current prices.
-4) Execution: engine.Executor applies Instructions, resolves live prices when needed, mutates the portfolio store, and appends events to the ledger while emitting human-readable receipts.
+1) Parsing: SophieParserFacade wraps the ANTLR-generated lexer/parser and turns source text into a parse tree. SophieAstBuilder converts the tree into the typed AST used everywhere else.  
+            This layer is also the right place to attach source spans (line/col) to AST nodes so every downstream error can point back to the exact snippet.
+
+2) Evaluation: engine.Evaluator walks the AST against MarketData, deciding which trades should execute and capturing portfolio targets. Indicator computations live in engine.Indicators.  
+               The output should be a *pure* high-level ExecutionPlan (what to do), decoupled from side effects, so you can “plan” and “execute” with the same semantics.
+
+3) Lowering: engine.Lowering transforms the ExecutionPlan into concrete Instruction objects (JSON-ready), resolving money-to-quantity conversions with current prices.  
+             This is the ideal checkpoint to enforce execution constraints (rounding, min size, precision rules) deterministically given a pricing snapshot.
+
+4) Execution: engine.Executor applies Instructions, resolves live prices when needed, mutates the portfolio store, and appends events to the ledger while emitting human-readable receipts.  
+              keep all side effects here (portfolio + ledger), so dry-run vs execute is just “don’t call Executor” (or run it against an in-memory store).
+
 5) Frontends:
    - CLI (cli.SophieCli): batch flow that loads a Sophie file, market data (demo or user-supplied), prints the plan, optionally prints instructions, and optionally executes them.
-   - TUI (frontend.SophieTui): interactive REPL that wires user commands through CommandHandler and ProgramEvaluator, keeps a PortfolioManager in memory, and can write ledger/portfolio snapshots.
-6) Persistence and I/O: FileJsonPortfolioStore and FileLedger manage on-disk state; ReceiptPrinter can append printable receipts. MarketData abstractions supply prices, series, and indicator overrides.
+   - TUI (frontend.SophieTui): interactive REPL that wires user commands through CommandHandler and ProgramEvaluator, keeps a PortfolioManager in memory, and can write ledger/portfolio snapshots.  
+   Frontends should stay thin adapters (I/O + presentation), reusing the same pipeline (Parse → Eval → Lower → Exec) to avoid duplicated business logic.
+
+6) Persistence and I/O: FileJsonPortfolioStore and FileLedger manage on-disk state; ReceiptPrinter can append printable receipts. MarketData abstractions supply prices, series, and indicator overrides.  
+                        The abstractions here are your swap points (file ↔ DB, demo prices ↔ live feed, backtest datasets), without touching evaluation/execution logic.
+
+Parse -> Validate -> Evaluate -> Lower -> Execute
 
 Current limitations to be aware of
 ----------------------------------
@@ -32,3 +45,25 @@ Current limitations to be aware of
 - Division by zero and missing market data are surfaced as runtime errors.
 - Indicator support is limited to SMA (MAVG), EMA, STDDEV, and RSI over close prices.
 - No order types beyond BUY/SELL market-style instructions are modeled today.
+
+Proposed solution (one coherent approach, applied to each limitation)
+----------------------------------
+Introduce a *alidation + Capability layer between Parsing and Evaluation, plus a couple of small “extension points” (registries). Concretely:
+
+- Multiple portfolio commands:
+  - Add a validation rule: either (i) reject >1 portfolio command with a clear compile-time error, or (ii) define semantics and fold them (sequentially apply commands into a single PortfolioSpec).
+  - Implementation: `Validator` scans the AST and returns structured diagnostics; `Evaluator` receives a *normalized* single portfolio spec.
+
+- Division by zero + missing MarketData:
+  - Validation pass catches obvious cases early (e.g., literal `/ 0`, indicator window invalid).
+  - For missing data, add an explicit policy (configurable): `FAIL_FAST | SKIP_TRADE | USE_LAST_KNOWN | REQUIRE_OVERRIDE`.
+  - Implementation: replace generic runtime exceptions with typed errors (`MissingPrice(symbol, date)`, `DivisionByZero(exprSpan)`) and include source spans.
+
+- Limited indicators:
+  - Add an `IndicatorRegistry` interface: `name -> (params, inputSeries) -> Series`.
+  - Support selecting input price field (`close`, `open`, `hlc3`, etc.) and cache computed series per (symbol, indicator, params) for speed.
+  - This keeps `engine.Indicators` small while making new indicators “plug-in style”.
+
+- Only market BUY/SELL instructions:
+  - Extend `Instruction` with `orderType` and optional fields (`limitPrice`, `stopPrice`, `timeInForce`).
+  - Executor handles triggers using MarketData snapshots (backtest) and/or live price resolution (live mode), reusing the same Instruction shape.
