@@ -254,32 +254,6 @@ object RunIntegrationRunner {
       // try best-effort cleanup
       try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
     }
-
-    if (totalFailures > 0) {
-      println("One or more integration checks FAILED")
-      sys.exit(1)
-    } else {
-      println("All integration checks PASSED")
-
-          if (failuresLocal == 0) println("[TUI] All simulations OK")
-        } catch { case NonFatal(e) =>
-          println(s"[TUI] FAILED with exception: ${e.getMessage}")
-          e.printStackTrace()
-          1
-        }
-
-        failuresLocal
-      } catch { case NonFatal(_) => 1 }
-
-      totalFailures = cliFailures + tuiFailures
-
-      // Summary
-      println(s"\n=== Integration runner summary: failures=$totalFailures ===")
-    } finally {
-      // try best-effort cleanup
-      try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
-    }
-
     if (totalFailures > 0) {
       println("One or more integration checks FAILED")
       sys.exit(1)
