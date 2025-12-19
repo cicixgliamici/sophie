@@ -1,0 +1,6 @@
+﻿TEST-cli.RunTuiSimSpec.xml 2025-12-19T17:33:44.0065782+01:00
+TEST-cli.SophieCliIntegrationSpec.xml 2025-12-19T17:33:44.0155885+01:00
+TEST-cli.SophieCliPrintInstructionsSpec.xml 2025-12-19T17:33:43.6545728+01:00
+TEST-cli.SophieCliProcessSpec.xml 2025-12-19T17:10:55.1255100+01:00
+TEST-cli.SophieCliReceiptFileSpec.xml 2025-12-19T17:33:43.7615788+01:00
+TEST-cli.SophieCliResetPortfolioSpec.xml 2025-12-19T17:33:43.8335773+01:00

@@ -75,3 +75,8 @@ assembly / assemblyMergeStrategy := {
 //   @header { package parser; }
 // the generated classes will be under that package. Otherwise they will
 // use the default package. Prefer setting the package header for clarity.
+
+// convenience alias to run the TUI simulation runner without typing the full command
+// Usage: in shell: `sbt runTuiSim`  -> executes `runMain RunTuiSim`
+// Keep this alias if you want a short way to run the non-interactive simulation runner.
+addCommandAlias("runTuiSim", "runMain RunTuiSim")

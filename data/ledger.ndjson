@@ -1,0 +1,8 @@
+{"ts":1766164480259,"action":"BUY","symbol":"MSFT","qty":"4.6875","price":"320.0","notional":"1500.00000","source":"ir:ir.json","note":"BUY 1500 EUR OF MSFT - condition met"}
+{"ts":1766164480261,"action":"SELL","symbol":"BTC","qty":"0.5","price":"62000.0","notional":"31000.00","source":"ir:ir.json","note":"SELL 0.5 BTC OF BTC - condition met"}
+{"ts":1766164707282,"action":"BUY","symbol":"MSFT","qty":"4.6875","price":"320.0","notional":"1500.00000","source":"ir:ir.json","note":"BUY 1500 EUR OF MSFT - condition met"}
+{"ts":1766164707285,"action":"SELL","symbol":"BTC","qty":"0.5","price":"62000.0","notional":"31000.00","source":"ir:ir.json","note":"SELL 0.5 BTC OF BTC - condition met"}
+{"ts":1766164786336,"action":"BUY","symbol":"MSFT","qty":"4.6875","price":"320.0","notional":"1500.00000","source":"ir:ir.json","note":"BUY 1500 EUR OF MSFT - condition met"}
+{"ts":1766164786339,"action":"SELL","symbol":"BTC","qty":"0.5","price":"62000.0","notional":"31000.00","source":"ir:ir.json","note":"SELL 0.5 BTC OF BTC - condition met"}
+{"ts":1766165024315,"action":"BUY","symbol":"MSFT","qty":"4.6875","price":"320.0","notional":"1500.00000","source":"ir:ir.json","note":"BUY 1500 EUR OF MSFT - condition met"}
+{"ts":1766165024318,"action":"SELL","symbol":"BTC","qty":"0.5","price":"62000.0","notional":"31000.00","source":"ir:ir.json","note":"SELL 0.5 BTC OF BTC - condition met"}

@@ -4,24 +4,19 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="Commentini">
-      <change afterPath="$PROJECT_DIR$/src/main/resources/logback.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/util/Logger.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/util/SLF4JLogger.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/cli/SophieCliReceiptFileSpec.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/ReceiptPrinterIoSpec.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/frontend/ReceiptPrinterSpec.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/util/LoggerSpec.scala" afterDir="false" />
+    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="Più test e logger">
+      <change afterPath="$PROJECT_DIR$/scripts/run-tui-tests.ps1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/script_explanation.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/RunTuiSim.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/testhelpers/NoExit.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/test/scala/testhelpers/ProcessRunner.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/build.sbt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/Main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/Main.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/ast/SophieAstBuilder.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/ast/SophieAstBuilder.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/cli/SophieCli.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/cli/SophieCli.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/engine/Ledger.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/engine/Ledger.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/PortfolioManager.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/PortfolioManager.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/ReceiptPrinter.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/ReceiptPrinter.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/frontend/SophieTui.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/frontend/SophieTui.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/integration/RunIntegrationRunner.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/integration/RunIntegrationRunner.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/scala/cli/SophieCliIntegrationSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/cli/SophieCliIntegrationSpec.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiIntegrationSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiIntegrationSpec.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tmp/ir.json" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/ir.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tmp/last_prog.sophie" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/last_prog.sophie" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tmp/pf.json" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/pf.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -172,7 +167,7 @@
       <workItem from="1765981517069" duration="10895000" />
       <workItem from="1766057199074" duration="9586000" />
       <workItem from="1766085600899" duration="5834000" />
-      <workItem from="1766152986192" duration="2481000" />
+      <workItem from="1766152986192" duration="11361000" />
     </task>
     <task id="LOCAL-00001" summary="Test!">
       <option name="closed" value="true" />
@@ -230,7 +225,15 @@
       <option name="project" value="LOCAL" />
       <updated>1766091511398</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Più test e logger">
+      <option name="closed" value="true" />
+      <created>1766155562062</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1766155562062</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -243,7 +246,8 @@
     <MESSAGE value="TUI funzionante" />
     <MESSAGE value="TUI funzionante e Test 50%" />
     <MESSAGE value="Commentini" />
-    <option name="LAST_COMMIT_MESSAGE" value="Commentini" />
+    <MESSAGE value="Più test e logger" />
+    <option name="LAST_COMMIT_MESSAGE" value="Più test e logger" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

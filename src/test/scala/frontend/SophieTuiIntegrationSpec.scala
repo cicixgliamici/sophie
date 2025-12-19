@@ -30,8 +30,18 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
     val inputs = Seq(
       ":set price MSFT 350",
       "BUY 100 EUR OF MSFT;",
+      "", // submit the pasted program
       ":show last", // should be treated as command, not appended to program
-@@ -67,26 +71,109 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
+      ":pf apply"
+    )
+    // simulate a session where paste mode sends a program followed by a command
+    val (pf, plan) = SophieTui.simulateSession(inputs)
+    // after execution the portfolio should contain MSFT from the BUY line
+    assert(pf.contains("MSFT"), s"Expected MSFT in portfolio after paste-mode program: $pf")
+    // ensure a plan was produced and it contains at least one trade
+    assert(plan.isDefined, "Expected an execution plan to be produced from paste-mode inputs")
+    assert(plan.get.trades.nonEmpty, "Expected at least one trade in the produced plan")
+  }
 
   test("multiple_buys_accumulate") {
     val inputs = Seq(
