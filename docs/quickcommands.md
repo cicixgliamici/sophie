@@ -37,7 +37,15 @@ scala> frontend.SophieTui.run()
 - Run the CLI on a `.sophie` file (example):
 
 ```bash
-sbt "runMain cli.SophieCli --file examples/buy_ok.sophie --run --ledger data/ledger.ndjson --portfolio data/portfolio.json"
+sbt "runMain cli.SophieCli --file tmp/buy_ok.sophie --run --ledger ledger.ndjson --portfolio portfolio.json"
+```
+
+If you don’t have a sample program yet, create one quickly:
+
+```bash
+cat > tmp/buy_ok.sophie <<'EOF'
+BUY 1500 EUR OF MSFT IF RSI(MSFT, 14) < 30 && MAVG(MSFT, 50) > PRICE(MSFT);
+EOF
 ```
 
 Notes about testing
@@ -59,4 +67,3 @@ If you want, I can also:
 - Add a short developer doc explaining where to add new tests for TUI/CLI.
 - Convert I/O adapters to traits (Ledger, PortfolioStore) to make mocking
   easier during tests.
-

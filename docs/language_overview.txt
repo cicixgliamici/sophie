@@ -5,14 +5,14 @@ This note summarizes what the Sophie DSL can express today and how the codebase 
 Language surface 
 -------------------------------------
 - Program shape: a file is a Program made of ordered statements.
-- Trade commands: BUY or SELL a symbol for a Value (amount + currency) guarded by an optional IF condition. If the IF part is omitted, the condition defaults to AlwaysTrue.
+- Trade commands: BUY or SELL a symbol for a Value (amount + currency) or an explicit quantity (QTY n), guarded by an optional IF condition. If the IF part is omitted, the condition defaults to AlwaysTrue.
 - Portfolio command: PORTFOLIO with one or more allocations, each specifying a Value and a target symbol. Only one portfolio block is honored per program; the first one wins.
-- Conditions: AND/OR combinations, comparisons (>, <, ==, !=) between operands, parenthesis, or a truthy check of any expression (treated as "!= 0").
+- Conditions: AND/OR combinations, comparisons (>, <, =, !=) between operands, parenthesis, or a truthy check of any expression (treated as "!= 0").
 - Operands you can compare or combine arithmetically:
   - Number literals.
   - PRICE(symbol) lookup.
-  - Series operations like BTC.close via SERIES(symbol, field).
-  - Indicators such as MAVG/EMA/STDDEV/RSI over closes via INDICATOR(name, symbol, period).
+  - Series operations like BTC.close via symbol.field (e.g., BTC.volume).
+  - Indicators such as MAVG/EMA/STDDEV/RSI over closes via MAVG(symbol, period) / EMA(symbol, period) / RSI(symbol, period) / STDDEV(symbol, period).
   - Arithmetic Binary expressions with +, -, *, / (division keeps scale and guards against /0).
 
 Runtime layers
