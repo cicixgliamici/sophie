@@ -97,6 +97,17 @@ statement
   Rationale: 'BTC' is tokenized as CURRENCY, not IDENTIFIER. With `symbol`, we
   allow both IDENTIFIER and CURRENCY to represent a tradable instrument.
 */
+/* CHANGE #2:
+  Tradable instruments are now parsed through `symbol` (IDENTIFIER | CURRENCY).
+  Rationale: currency tickers like "BTC" are lexed as CURRENCY (reserved word),
+  so they would not match IDENTIFIER in places such as "OF BTC" or "BTC.volume".
+  The `symbol` rule unifies how we refer to instruments everywhere in the DSL.
+  Trade commands now accept a generic `consideration`:
+       - `value`  (e.g., "1500 EUR")  -> monetary amount
+       - `QTY n`   (e.g., "QTY 5")     -> explicit quantity without price conversion
+  Additionally, the IF-clause is optional: "(IF condition)?".
+
+*/
 trade_cmd
   : (BUY | SELL) consideration OF symbol (IF condition)?
   ;
