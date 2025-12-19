@@ -21,7 +21,7 @@ When a TUI command is entered
    - Market data edits (`:set price`, `:set series`, `:set ovr`) call into `SophieTui` mutators that update the in-memory market snapshot.
    - Persistence (`:load md`, `:save md`, `:save prog`) uses `SophieTui` helpers to read/write JSON or source files.
    - Portfolio operations (`:pf new|show|apply|preview|save|load`) delegate to `PortfolioManager`, which reads prices through the injected lookup and emits output via the shared printer.
-   - IR interactions (`:compile ir`, `:exec ir`) call back to `SophieTui` to lower the last plan to JSON instructions or to execute an IR file via `Executor.run`, persisting the resulting portfolio and ledger.
+   - IR interactions (`:compile ir`, `:exec ir`) call back to `SophieTui` to lower the last plan to JSON instructions or to execute an IR file via `Executor.run`, persisting the resulting portfolio and ledger. IR execution writes to `data/portfolio.json` and `data/ledger.ndjson` by default.
 3) The handler returns a boolean indicating whether the REPL should continue; `:q`/`:quit` short-circuit the loop.
 
 When a DSL program is submitted
