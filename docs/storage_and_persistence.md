@@ -10,11 +10,10 @@ This document describes where the Sophie application stores files, which formats
   - These defaults can be overridden with the CLI flags `--portfolio <path>` and `--ledger <path>`.
 
 - TUI defaults (when using the interactive TUI `TuiMain` / `SophieTui`):
-  - Many TUI commands and the IR executor use the `data/` directory by default.
-  - Typical defaults used by TUI commands:
+  - The IR executor uses the `data/` directory by default:
     - Portfolio file for IR execution: `data/portfolio.json`
     - Ledger file for IR execution: `data/ledger.ndjson`
-  - The TUI `:pf save` / `:pf load` commands accept explicit file paths to save/load a portfolio anywhere you choose.
+  - Other TUI commands (`:pf save`, `:pf load`, `:save md`, `:save prog`) always require explicit file paths you provide.
 
 2) File formats
 
@@ -64,7 +63,7 @@ This document describes where the Sophie application stores files, which formats
   - In-memory reset: use `:pf new` to reset the in-memory portfolio state in the TUI session. This affects the simulated portfolio used by TUI commands like `:pf show` and `:pf apply`.
   - Save / overwrite to disk: after resetting (or editing) you can use `:pf save <path.json>` to write the current in-memory portfolio to a file. If you provide an existing path, it will be overwritten.
   - Load from disk: use `:pf load <path.json>` to load a portfolio file into the TUI session.
-  - IR execution path: when executing IR instructions with `:exec ir <file.json>` the TUI will by default create or update files under `data/` (e.g. `data/portfolio.json` and `data/ledger.ndjson`) unless you change the code or provide different file paths via commands.
+- IR execution path: when executing IR instructions with `:exec ir <file.json>` the TUI will by default create or update files under `data/` (e.g. `data/portfolio.json` and `data/ledger.ndjson`). Changing these paths currently requires a code change (there are no TUI flags to override them).
 
 4) Recommended workflows for testing (clear reproducible state)
 
@@ -84,7 +83,7 @@ This document describes where the Sophie application stores files, which formats
 5) Notes and caveats
 
 - Working directory matters: the CLI uses relative paths from the process working directory. If you run sbt from the project root, default `portfolio.json` and `ledger.ndjson` will be created in the project root unless you pass explicit paths.
-- TUI tends to use the `data/` subdirectory for default persistence in some commands (especially for IR execution). If you want a single canonical place for test artifacts, prefer providing explicit `--ledger`/`--portfolio` paths in the CLI or explicit paths in TUI commands.
+- TUI uses the `data/` subdirectory only for IR execution. If you want a single canonical place for test artifacts, prefer providing explicit `--ledger`/`--portfolio` paths in the CLI or explicit paths in TUI save/load commands.
 - The JSON formats are stable but rely on the project's upickle codecs. If you modify `frontend.PortfolioJson.PortfolioJ` or codec behavior, the on-disk format may change accordingly.
 
 6) Quick reference (commands)
@@ -102,9 +101,3 @@ This document describes where the Sophie application stores files, which formats
   - Run a program from disk: `:run prog data/examples/buy_example.sophie`
   - Compile last plan to IR: `:compile ir data/out_instructions.json`
   - Execute IR (updates `data/portfolio.json` and appends `data/ledger.ndjson` by default): `:exec ir data/out_instructions.json`
-
-If you want, I can also:
-- add a short `docs/README.md` with these steps and a recommended test script, or
-- add a small `scripts/run_example.ps1` that runs a reproducible test cycle (reset + run + show resulting files).
-
-
