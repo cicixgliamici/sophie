@@ -1,8 +1,10 @@
 package integration
 
+import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
 import java.nio.file.Path
 import scala.util.control.NonFatal
+import upickle.default.read
 
 /**
   * Integration Runner
@@ -31,6 +33,33 @@ object RunIntegrationRunner {
 
     var totalFailures: Int = 0
 
+    case class ExitTrapped(status: Int) extends SecurityException(s"System.exit($status)")
+
+    def withExitTrapped[T](block: => T): Either[Int, T] = {
+      val previous = System.getSecurityManager
+      System.setSecurityManager(new SecurityManager {
+        override def checkExit(status: Int): Unit = throw ExitTrapped(status)
+        override def checkPermission(perm: java.security.Permission): Unit = ()
+      })
+      try {
+        Right(block)
+      } catch {
+        case ExitTrapped(status) => Left(status)
+      } finally {
+        System.setSecurityManager(previous)
+      }
+    }
+
+    def withInput[T](input: String)(block: => T): T = {
+      val previousIn = System.in
+      try {
+        System.setIn(new java.io.ByteArrayInputStream(input.getBytes(UTF_8)))
+        block
+      } finally {
+        System.setIn(previousIn)
+      }
+    }
+
     try {
       println(s"Integration runner temporary dir: $tmpDir")
 
@@ -43,6 +72,8 @@ object RunIntegrationRunner {
           val pf = tmpDir.resolve("cli_pf.json")
           val ledger = tmpDir.resolve("cli_ledger.ndjson")
 
+          val symbol = "MSFT"
+          val expectedCurrency = "EUR"
           val args = Array(
             "--file", "src/test/resources/programs/buy_ok.sophie",
             "--md", "src/main/resources/md_demo.json",
@@ -64,15 +95,78 @@ object RunIntegrationRunner {
             failuresLocal += 1
           } else {
             val pfText = Files.readString(pf)
-            val ledgerText = Files.readString(ledger)
-            if (!pfText.contains("MSFT")) {
-              println(s"[CLI] Portfolio JSON does not contain expected symbol MSFT: $pfText")
+            val pfJson = read[frontend.PortfolioJson.PortfolioJ](pfText)
+            val totalQty = pfJson.positions.values.foldLeft(BigDecimal(0))(_ + _)
+            if (totalQty <= 0) {
+              println(s"[CLI] Portfolio total quantity not positive: $totalQty")
               failuresLocal += 1
             }
-            if (!ledgerText.toUpperCase.contains("MSFT")) {
-              println(s"[CLI] Ledger does not contain expected symbol MSFT: $ledgerText")
+            if (pfJson.cash.isEmpty) {
+              println(s"[CLI] Portfolio JSON missing cash field (expected currency=$expectedCurrency): $pfText")
               failuresLocal += 1
             }
+
+            val ledgerEntries = engine.FileLedger(ledger).readAll()
+            if (ledgerEntries.isEmpty) {
+              println(s"[CLI] Ledger has no entries: $ledger")
+              failuresLocal += 1
+            }
+            if (!ledgerEntries.exists(_.symbol == symbol)) {
+              println(s"[CLI] Ledger entries missing expected symbol $symbol: $ledgerEntries")
+              failuresLocal += 1
+            }
+
+            // Second CLI run (without --reset-portfolio) and verify updates
+            val initialQty = pfJson.positions.getOrElse(symbol, BigDecimal(0))
+            val initialLedgerCount = ledgerEntries.size
+            val args2 = Array(
+              "--file", "src/test/resources/programs/buy_ok.sophie",
+              "--md", "src/main/resources/md_demo.json",
+              "--run",
+              "--portfolio", pf.toString,
+              "--ledger", ledger.toString
+            )
+            withInput("n\n") {
+              cli.SophieCli.main(args2)
+            }
+
+            val pfText2 = Files.readString(pf)
+            val pfJson2 = read[frontend.PortfolioJson.PortfolioJ](pfText2)
+            val updatedQty = pfJson2.positions.getOrElse(symbol, BigDecimal(0))
+            if (updatedQty <= initialQty) {
+              println(s"[CLI] Portfolio quantity did not increase for $symbol (initial=$initialQty updated=$updatedQty)")
+              failuresLocal += 1
+            }
+            val ledgerEntries2 = engine.FileLedger(ledger).readAll()
+            if (ledgerEntries2.size <= initialLedgerCount) {
+              println(s"[CLI] Ledger did not grow after second run (initial=$initialLedgerCount updated=${ledgerEntries2.size})")
+              failuresLocal += 1
+            }
+
+            // CLI error test: invalid program should fail and be reported
+            val badProgram = tmpDir.resolve("invalid_program.sophie")
+            Files.writeString(badProgram, "BUY ???", UTF_8)
+            val badArgs = Array(
+              "--file", badProgram.toString,
+              "--md", "src/main/resources/md_demo.json",
+              "--run",
+              "--portfolio", tmpDir.resolve("bad_pf.json").toString,
+              "--ledger", tmpDir.resolve("bad_ledger.ndjson").toString,
+              "--reset-portfolio"
+            )
+            withExitTrapped {
+              cli.SophieCli.main(badArgs)
+            } match {
+              case Left(status) if status != 0 =>
+                println(s"[CLI] Controlled failure observed for invalid program (status=$status)")
+              case Left(status) =>
+                println(s"[CLI] Invalid program exited with status 0 (unexpected)")
+                failuresLocal += 1
+              case Right(_) =>
+                println(s"[CLI] Invalid program did not fail as expected")
+                failuresLocal += 1
+            }
+
             if (failuresLocal == 0) println("[CLI] OK")
           }
         } catch { case NonFatal(e) =>
@@ -116,6 +210,56 @@ object RunIntegrationRunner {
             println(s"[TUI] sim3 expected empty portfolio but got: $pf3")
             failuresLocal += 1
           }
+          if (!plan3.isDefined) {
+            println(s"[TUI] sim3 expected lastPlan to be defined for warning case")
+            failuresLocal += 1
+          }
+
+          // Simulation 4: set price, series, override, show md, then apply
+          val inputs4 = Seq(
+            ":set price MSFT 320",
+            ":set series MSFT volume 10,2000000",
+            ":set ovr STDDEV MSFT 20 60000",
+            ":show md",
+            "BUY 100 EUR OF MSFT IF MSFT.volume > 1000000 && STDDEV(MSFT, 20) > PRICE(MSFT);",
+            "",
+            ":pf apply"
+          )
+          val (pf4, plan4) = frontend.SophieTui.simulateSession(inputs4)
+          println(s"[TUI] sim4 portfolio: $pf4  lastPlanPresent=${plan4.isDefined}")
+          if (!pf4.contains("MSFT")) {
+            println(s"[TUI] sim4 missing MSFT in portfolio: $pf4")
+            failuresLocal += 1
+          }
+          if (!plan4.isDefined) {
+            println(s"[TUI] sim4 expected lastPlan to be defined")
+            failuresLocal += 1
+          }
+
+          if (failuresLocal == 0) println("[TUI] All simulations OK")
+        } catch { case NonFatal(e) =>
+          println(s"[TUI] FAILED with exception: ${e.getMessage}")
+          e.printStackTrace()
+          1
+        }
+
+        failuresLocal
+      } catch { case NonFatal(_) => 1 }
+
+      totalFailures = cliFailures + tuiFailures
+
+      // Summary
+      println(s"\n=== Integration runner summary: failures=$totalFailures ===")
+    } finally {
+      // try best-effort cleanup
+      try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
+    }
+
+    if (totalFailures > 0) {
+      println("One or more integration checks FAILED")
+      sys.exit(1)
+    } else {
+      println("All integration checks PASSED")
 
           if (failuresLocal == 0) println("[TUI] All simulations OK")
         } catch { case NonFatal(e) =>
