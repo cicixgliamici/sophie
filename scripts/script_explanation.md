@@ -83,27 +83,3 @@ Get-Content .\tmp\tui_test_artifacts\manifest.txt -Raw
 # Apri lo zip degli artefatti (es. con explorer o estrailo)
 # Windows Explorer: start .\tmp\tui_test_artifacts\tui_test_artifacts.zip
 ```
-
-Cosa fare se vuoi estendere/automatizzare ancora
-------------------------------------------------
-- Aggiungere un task sbt (ad esempio `runTuiSim`) per eseguire direttamente `RunTuiSim` senza passare da PowerShell.
-  
-  Aggiunta: è stato creato un alias sbt `runTuiSim` che esegue `runMain RunTuiSim`. Puoi avviarlo con:
-
-  ```powershell
-  sbt runTuiSim
-  ```
-  Questo esegue lo stesso runner non-interattivo `RunTuiSim` senza dover digitare `runMain`.
-
-- Modificare `SophieTui` per caricare automaticamente `data/portfolio.json` nel `PortfolioManager` dopo `:exec ir` (migliora UX interattiva).
-- Includere lo script nello CI definendo un job che esegue `scripts/run-tui-tests.ps1` su Windows runner.
-
-Note finali
------------
-Ho creato questo file per spiegare lo script come richiesto e ho eseguito lo script sul repository (sono stati creati `tmp/tui_sim_report.json` e la cartella `tmp/tui_test_artifacts/`). Se vuoi, posso: 
-
-- Aggiungere il task sbt proposto o
-- Implementare la sincronizzazione in-memory dopo `:exec ir` oppure
-- Personalizzare il report JSON (includere timestamp, exit codes, ecc.).
-
-Dimmi quale di queste opzioni preferisci e la implemento subito.
