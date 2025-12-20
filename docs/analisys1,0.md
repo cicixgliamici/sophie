@@ -5,19 +5,17 @@
 ### Key reasons
 
 - The core pipeline is implemented and documented (**parse → AST → evaluate → lower → execute**).  
-  Reference: `docs/language_overview.txt`
 - The CLI and TUI are wired to that pipeline and support execution plus persistence.  
   References:  
   - `src/main/scala/cli/SophieCli.scala`  
   - `src/main/scala/frontend/SophieTui.scala`  
   - `docs/storage_and_persistence.md`
 - Current limitations are clearly documented (single portfolio command, limited indicators, runtime errors for missing data, no order types beyond market BUY/SELL).  
-  Reference: `docs/language_overview.txt`
 
 ### MVP 0 fit
 
-- ✅ Good for demos, interactive exploration, and local simulations.  
-- ❌ Not yet ready for real-world trading or production reliability.
+- Good for demos, interactive exploration, and local simulations.  
+- Not yet ready for real-world trading or production reliability.
 
 ---
 
@@ -69,11 +67,6 @@ The repository follows a classic layered compiler/runtime pipeline.
 - Grammar in `sophie.g4`, generated parser/lexer into Java.
 - `SophieParserFacade` + `SophieAstBuilder` convert parse tree → typed AST.
 
-References:
-- `src/main/antlr4/sophie.g4`
-- `src/main/scala/frontend/SophieParserFacade.scala`
-- `src/main/scala/ast/SophieAstBuilder.scala`
-
 ### AST layer
 
 - Typed AST with `case class` + `sealed trait` nodes.  
@@ -113,7 +106,7 @@ This matches the documented flow: **Parse → Evaluate → Lower → Execute** (
 
 ## 4) Functional vs. Imperative vs. OOP
 
-### Executive Summary (Functional Orientation)
+### Functional Orientation
 
 The codebase is predominantly **functional in the core** (AST, evaluation, lowering, pure transformations) and **imperative at the boundaries** (CLI/TUI I/O, persistence, execution).
 
@@ -143,7 +136,7 @@ Sources:
 ### 2.1 `val` vs `var`
 
 - Total `val` occurrences: **626**
-- Total `var` occurrences: **5** (some are in comments or tests)
+- Total `var` occurrences: **5** 
 
 Commands used:
 - `rg -o "\\bval\\b" src/main/scala src/test/scala | wc -l`
@@ -182,7 +175,6 @@ Interpretation: Tail recursion is used for the TUI REPL loops, while explicit `w
 ### 3.1 Immutable data modeling (Algebraic Data Types)
 
 The AST uses `sealed trait` + `case class`, enabling immutability, pattern matching, and exhaustive checking.  
-Source: `src/main/scala/ast/AST.scala`
 
 ### 3.2 Pure transformations & stateless core
 
@@ -208,7 +200,6 @@ Examples:
 ### 3.4 Tail recursion
 
 TUI loop is tail-recursive, annotated with `@tailrec`.  
-Source: `src/main/scala/frontend/SophieTui.scala`
 
 ### 3.5 Explicit effect boundaries
 
@@ -317,55 +308,31 @@ From the code and docs, key MVP 0 limitations are:
 
 ---
 
-## 7) Overall assessment (MVP 0)
-
-### ✅ Yes for a local, simulated MVP 0
-
-You can parse a DSL program, evaluate it, preview a plan, lower to IR, and execute it with ledger/portfolio persistence via CLI or TUI.  
-Sources:
-- `docs/language_overview.txt`
-- `src/main/scala/cli/SophieCli.scala`
-- `src/main/scala/frontend/SophieTui.scala`
-
-### ❌ Not yet for production or “MVP” with real trading integration
-
-Lacks richer validation, broader indicator library, order types, and live data/broker connectivity.  
-Source: `docs/language_overview.txt`
-
----
-
 # Sophie Language — Theoretical Analysis
 
 ## 1) Associativity (Right/Left)
-
-Associativity is derived from the grammar structure in `src/main/antlr4/sophie.g4`.
 
 ### 1.1 Arithmetic expressions
 
 - `expr : term ((PLUS | MINUS) term)*`  
   This form is **left-associative** for `+` and `-` because it parses as a sequence of `term` nodes combined from left to right.  
-  Source: `src/main/antlr4/sophie.g4`
 
 - `term : primary ((MUL | DIV) primary)*`  
   Similarly **left-associative** for `*` and `/`.  
-  Source: `src/main/antlr4/sophie.g4`
 
 ### 1.2 Boolean logic
 
 - `disjunction : conjunction (OR conjunction)*`  
   This is **left-associative** for `OR`, because it builds a flat chain from left to right.  
-  Source: `src/main/antlr4/sophie.g4`
 
 - `conjunction : (comparison | LPAR condition RPAR) (AND conjunction)?`  
   This is **right-associative** for `AND`, because recursion is on the right side.  
   Example parse: `A && B && C` becomes `A && (B && C)`.  
-  Source: `src/main/antlr4/sophie.g4`
 
 ### 1.3 Comparisons
 
 - `comparison : expr ((GT | LT | EQ | NEQ) expr)?`  
   Comparisons are **non-associative**: only one comparison operator is allowed per comparison node (you can’t chain `a < b < c` without parentheses).  
-  Source: `src/main/antlr4/sophie.g4`
 
 ---
 
@@ -376,9 +343,6 @@ Associativity is derived from the grammar structure in `src/main/antlr4/sophie.g
 The language is a trading-oriented DSL aimed at expressing trades and portfolio allocations rather than general computation.
 
 It is declarative: users specify what trades/allocations they want, not how to execute them.  
-Sources:
-- `docs/language_overview.txt`
-- `src/main/antlr4/sophie.g4`
 
 ### 2.2 Statement-based program structure
 
@@ -387,23 +351,18 @@ A program is a sequence of statements separated by semicolons:
 - `program : (statement SEMICOLON?)+ EOF`
 
 Statements are either trade commands or portfolio commands.  
-Source: `src/main/antlr4/sophie.g4`
 
 ### 2.3 Strongly typed, structured syntax
 
 Uses explicit keywords (`BUY`, `SELL`, `PORTFOLIO`, `IF`, `QTY`) and reserved currencies (`EUR`, `USD`, `GBP`, `BTC`).
 
 Symbols are explicitly separated from currencies via a `symbol` rule.  
-Source: `src/main/antlr4/sophie.g4`
 
 ### 2.4 Expression features
 
 Supports arithmetic, comparisons, logical operators, and parentheses.
 
 Operands include numeric literals, price lookup, time-series fields (`BTC.volume`), and indicators (`MAVG`, `EMA`, `STDDEV`, `RSI`).  
-Sources:
-- `src/main/antlr4/sophie.g4`
-- `docs/language_overview.txt`
 
 ### 2.5 Truthiness, quantities, and market data semantics
 
@@ -424,6 +383,3 @@ While not part of the grammar, the language’s execution semantics are tied to 
 - **Portfolio** state is persisted as JSON (`positions` map, optional `cash`) using `PortfolioJ`.
 - **Ledger** is persisted as NDJSON (one event per line).
 This impacts how executions are replayed or audited.
-Sources:
-- `docs/storage_and_persistence.md`
-- `src/main/scala/engine/Ledger.scala`
