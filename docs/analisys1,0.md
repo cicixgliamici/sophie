@@ -1,9 +1,6 @@
-# Sophie Codebase Analysis Report (MVP 0 Readiness)
+# Sophie Codebase Report (MVP 0 Readiness)
 
 ## 1) Executive summary: MVP 0 readiness
-
-> **Short answer:** The project is close to an **MVP 0** for a **local, DSL-driven trading simulation** (parse → evaluate → plan → optionally execute), with a working **CLI** and **TUI**, **persistence** for portfolio/ledger, and a **test suite**.  
-> It is **not yet an MVP for real trading** or production use due to limited validation, limited indicator set, and no real data/broker integration.
 
 ### Key reasons
 
