@@ -389,4 +389,3 @@ Source: `docs/language_overview.txt`
 While not part of the grammar, the language’s execution semantics are tied to file formats:
 - **Portfolio** state is persisted as JSON (`positions` map, optional `cash`) using `PortfolioJ`.
 - **Ledger** is persisted as NDJSON (one event per line).
-This impacts how executions are replayed or audited.
