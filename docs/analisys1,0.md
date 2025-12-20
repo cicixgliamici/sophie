@@ -32,10 +32,6 @@
   - indicators (`MAVG` / `EMA` / `STDDEV` / `RSI`)
   - arithmetic expressions
 
-References:
-- `docs/language_overview.txt`
-- `src/main/antlr4/sophie.g4`
-
 ### Runtime capabilities
 
 - Parse and transform to AST  
@@ -110,13 +106,24 @@ This matches the documented flow: **Parse → Evaluate → Lower → Execute** (
 
 The codebase is predominantly **functional in the core** (AST, evaluation, lowering, pure transformations) and **imperative at the boundaries** (CLI/TUI I/O, persistence, execution).
 
-Functional practices include:
+### Functional practices include:
 - immutability via `val`
+  - **Why functional:** values don’t change after creation → less shared mutable state, fewer side effects; compared to `var`, it prevents “action at a distance” bugs and makes reasoning/testing simpler.
+
 - algebraic data types (`sealed trait` + `case class`)
+  - **Why functional:** models your domain as a closed set of variants → exhaustive handling + strong invariants; compared to OOP class hierarchies, you get safer refactors and fewer runtime “unknown case” errors.
+
 - pattern matching
+  - **Why functional:** declarative branching over data shapes → clearer intent and usually exhaustive (especially with sealed ADTs); compared to imperative `if/else` chains or polymorphic dispatch, it centralizes logic and reduces boilerplate.
+
 - higher-order functions
+  - **Why functional:** behavior is a value (functions passed around) → compose operations cleanly (map/filter/fold), reduce duplicated loops; compared to imperative loops with accumulators, it’s often shorter and easier to audit.
+
 - tail recursion
+  - **Why functional:** expresses iteration as recursion without stack growth (optimized) → keeps code pure/expressive while staying efficient; compared to imperative loops, it preserves functional style without performance penalties.
+
 - explicit state threading (stateless design)
+  - **Why functional:** state is passed explicitly (inputs → outputs) instead of hidden globals → deterministic behavior, easier debugging and property testing; compared to imperative hidden state, it reduces temporal coupling and makes execution predictable.
 
 Imperative elements appear in file I/O, console I/O, and a few `var` uses mainly in integration/test helpers.
 
