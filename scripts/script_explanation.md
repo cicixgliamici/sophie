@@ -1,85 +1,86 @@
-# script_explanation — spiegazione dello script `run-tui-tests.ps1`
+# scripts/ — PowerShell helpers
 
-Scopo
------
-Questo documento spiega come usare lo script PowerShell `scripts/run-tui-tests.ps1` che esegue una batteria di test TUI end-to-end: compila il progetto, esegue i test, lancia il runner non-interattivo `RunTuiSim`, e raccoglie i file di output e i log in una cartella di artefatti.
+## Purpose
+The `scripts/` folder groups Windows PowerShell helper scripts used to run tests, TUI simulations, and collect logs/artifacts. They are intended for local usage or CI on Windows runners.
 
-Dove si trova
-------------
+## Contents
+- `run-tui-tests.ps1`: runs a full TUI test flow (optional build + test), executes the non-interactive TUI simulation runner (`RunTuiSim`), and collects artifacts/logs into a zip file.
+- `run-and-collect-tests.ps1`: runs `sbt test`, captures the full output, and extracts a compact summary for quick inspection.
+- `run-integration-tests.ps1`: runs the integration test runner (`integration.RunIntegrationRunner`) and then executes `sbt test`.
+
+## `run-tui-tests.ps1` details
+
+### Purpose
+This script executes a complete TUI end-to-end flow: it compiles the project, runs tests, launches the non-interactive runner `RunTuiSim`, and collects output files and logs into an artifacts directory.
+
+### Locations referenced by the script
 - Script: `scripts/run-tui-tests.ps1`
-- Runner Scala non-interattivo: `src/main/scala/RunTuiSim.scala`
-- File di input usato dal runner: `docs/tui_commands.txt`
-- Report di simulazione prodotto: `tmp/tui_sim_report.json`
-- Cartella artefatti raccolti (default): `tmp/tui_test_artifacts/`
-- Zip degli artefatti: `tmp/tui_test_artifacts/tui_test_artifacts.zip`
+- Scala non-interactive runner: `src/main/scala/RunTuiSim.scala`
+- Input file used by the runner: `docs/tui_commands.txt`
+- Simulation report produced: `tmp/tui_sim_report.json`
+- Artifacts directory (default): `tmp/tui_test_artifacts/`
+- Artifacts zip: `tmp/tui_test_artifacts/tui_test_artifacts.zip`
 
-Prerequisiti
-------------
-- Windows PowerShell (si usa `powershell.exe` nel repository). 
-- sbt installato e accessibile dalla PATH.
-- JDK/JRE (controlla con `java -version`).
-- Consigliato: impostare la code page della console su UTF-8 per evitare problemi di encoding (accenti) prima di eseguire lo script.
+### Prerequisites
+- Windows PowerShell (the repository uses `powershell.exe`).
+- `sbt` installed and available on `PATH`.
+- JDK/JRE available (`java -version`).
+- Recommended: set the console code page to UTF-8 to avoid encoding issues.
 
-Uso rapido
-----------
-Apri PowerShell nella root del repository e lancia:
+### Quick usage
+Open PowerShell in the repository root and run:
 
 ```powershell
-# esecuzione completa (build, test, simulazione)
+# Full run (build, test, simulation)
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-tui-tests.ps1
 
-# oppure saltando la build/test (utile se hai già compilato)
+# Skip build/test (useful if already compiled)
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-tui-tests.ps1 -SkipBuild
 ```
 
-Cosa fa lo script (passi principali)
------------------------------------
-1. Imposta la code page su UTF-8 (chcp 65001) per rendere l'output leggibile.
-2. (default) Esegue `sbt clean compile` e salva l'output in `tmp/tui_test_artifacts/sbt_compile_output.txt`.
-3. (default) Esegue `sbt test` e salva l'output in `tmp/tui_test_artifacts/sbt_test_output.txt`.
-4. Esegue il runner Scala `RunTuiSim` con `sbt "runMain RunTuiSim"` e salva l'output in `tmp/tui_test_artifacts/run_tuisim_output.txt`.
-5. Copia in `tmp/tui_test_artifacts/` le directory e i file utili (cartelle `tmp/`, `data/`, `target/global-logging/` quando presenti).
-6. Crea un manifesto (`manifest.txt`) con il dettaglio dei file raccolti.
-7. Comprime il contenuto di `tmp/tui_test_artifacts/` in `tmp/tui_test_artifacts/tui_test_artifacts.zip`.
+### What the script does (high-level steps)
+1. Sets the console code page to UTF-8 (`chcp 65001`) so output is readable.
+2. (Default) Runs `sbt clean compile` and saves output to `tmp/tui_test_artifacts/sbt_compile_output.txt`.
+3. (Default) Runs `sbt test` and saves output to `tmp/tui_test_artifacts/sbt_test_output.txt`.
+4. Runs the Scala runner `RunTuiSim` using `sbt "runMain RunTuiSim"` and saves output to `tmp/tui_test_artifacts/run_tuisim_output.txt`.
+5. Copies useful directories and files into `tmp/tui_test_artifacts/` (`tmp/`, `data/`, `target/global-logging/` when present).
+6. Creates a manifest (`manifest.txt`) with the list of collected files.
+7. Zips the artifacts directory into `tmp/tui_test_artifacts/tui_test_artifacts.zip`.
 
-Parametri dello script
-----------------------
-- `-OutDir <path>`: percorso di destinazione per gli artefatti (default: `.\tmp\tui_test_artifacts`).
-- `-SkipBuild`: flag; se presente salta i passi `sbt clean compile` e `sbt test` (utile se si esegue frequentemente la sola simulazione).
+### Script parameters
+- `-OutDir <path>`: destination for artifacts (default: `.	mp\tui_test_artifacts`).
+- `-SkipBuild`: skip `sbt clean compile` and `sbt test`.
 
-Cosa aspettarsi (file importanti)
----------------------------------
-- `tmp/tui_sim_report.json`: report JSON prodotto da `RunTuiSim` con la lista di input usati, il portafoglio finale e se è presente un piano.
-- `tmp/last_prog.sophie`, `tmp/ir.json`, `tmp/pf.json` ecc. (se prodotti dalla simulazione).
-- `data/portfolio.json` e `data/ledger.ndjson` (se `:exec ir` è stato invocato durante la simulazione).
-- `tmp/tui_test_artifacts/run_tuisim_output.txt`: output console della simulazione.
-- `tmp/tui_test_artifacts/sbt_test_output.txt`: output dei test sbt.
-- `tmp/tui_test_artifacts/manifest.txt`: elenco completo dei file raccolti.
+### Expected outputs (important files)
+- `tmp/tui_sim_report.json`: JSON report from `RunTuiSim` with the input list, final portfolio, and whether a plan exists.
+- `tmp/last_prog.sophie`, `tmp/ir.json`, `tmp/pf.json`, etc. (if produced by the simulation).
+- `data/portfolio.json` and `data/ledger.ndjson` (if `:exec ir` is used during the simulation).
+- `tmp/tui_test_artifacts/run_tuisim_output.txt`: console output from the simulation.
+- `tmp/tui_test_artifacts/sbt_test_output.txt`: sbt test output.
+- `tmp/tui_test_artifacts/manifest.txt`: complete list of collected files.
 
-Problemi noti e troubleshooting rapido
--------------------------------------
-1. Caratteri corrotti/accents (es. "Quantit├á") nella console:
-   - Prima di eseguire lo script: `chcp 65001` e avviare sbt con `-J-Dfile.encoding=UTF-8` se necessario.
-2. Warning Java (sun.misc.Unsafe, JNA): è normale su JDK recenti; non bloccano l'esecuzione.
-3. Comandi "Unknown command" nella TUI: spesso sono dovuti a typo o argomenti non separati da spazi (es. `:set ovr RSI MSFT 1425` era `14 25` unito). Controllare sintassi in `docs/tui_commands.txt`.
-4. `:exec ir` salva su disco (`data/`), ma non aggiorna automaticamente il gestore di portafoglio in memoria nella TUI; per vedere subito il risultato nella sessione interattiva dopo `:exec` eseguire `:pf load data/portfolio.json`.
-5. Se i log sbt non vengono catturati correttamente (caratteri non leggibili), lo script ora salva i log usando `Out-File -Encoding utf8`.
+### Known issues & quick troubleshooting
+1. Garbled characters/accents in the console:
+   - Run `chcp 65001` before executing the script and, if needed, start sbt with `-J-Dfile.encoding=UTF-8`.
+2. Java warnings (sun.misc.Unsafe, JNA): these are expected on newer JDKs and do not block execution.
+3. "Unknown command" in the TUI: usually due to typos or missing spaces (for example `:set ovr RSI MSFT 1425` instead of `14 25`). Check syntax in `docs/tui_commands.txt`.
+4. `:exec ir` writes to disk (`data/`) but does not refresh the in-memory portfolio. To update the interactive session after `:exec`, run `:pf load data/portfolio.json`.
+5. If sbt logs are not captured correctly, the script writes logs using `Out-File -Encoding utf8`.
 
-Come ispezionare rapidamente i risultati (comandi esempio)
----------------------------------------------------------
+### Quick inspection commands (examples)
 ```powershell
-# Visualizza il report JSON della simulazione
+# View the simulation JSON report
 Get-Content .\tmp\tui_sim_report.json -Raw | Out-String
 
-# Controlla il portfolio scritto su disco
+# Check the portfolio written to disk
 Get-Content .\data\portfolio.json -Raw
 
-# Visualizza le prime righe del ledger
+# View the first lines of the ledger
 Get-Content .\data\ledger.ndjson | Select-Object -First 20
 
-# Controlla il manifest degli artefatti
+# Check the artifacts manifest
 Get-Content .\tmp\tui_test_artifacts\manifest.txt -Raw
 
-# Apri lo zip degli artefatti (es. con explorer o estrailo)
+# Open the artifacts zip
 # Windows Explorer: start .\tmp\tui_test_artifacts\tui_test_artifacts.zip
 ```
