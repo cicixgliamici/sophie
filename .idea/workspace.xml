@@ -5,18 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="Più test e logger">
-      <change afterPath="$PROJECT_DIR$/scripts/run-tui-tests.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/script_explanation.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/RunTuiSim.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/testhelpers/NoExit.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/test/scala/testhelpers/ProcessRunner.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/build.sbt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/scala/cli/SophieCliIntegrationSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/cli/SophieCliIntegrationSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiIntegrationSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/scala/frontend/SophieTuiIntegrationSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tmp/ir.json" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/ir.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tmp/last_prog.sophie" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/last_prog.sophie" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tmp/pf.json" beforeDir="false" afterPath="$PROJECT_DIR$/tmp/pf.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -168,6 +157,7 @@
       <workItem from="1766057199074" duration="9586000" />
       <workItem from="1766085600899" duration="5834000" />
       <workItem from="1766152986192" duration="11361000" />
+      <workItem from="1766326928996" duration="410000" />
     </task>
     <task id="LOCAL-00001" summary="Test!">
       <option name="closed" value="true" />
