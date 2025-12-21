@@ -106,7 +106,7 @@ class PortfolioManager() {
     msgs: Vector[String]
   ): (BigDecimal, Vector[String]) =
     if (value.currency == sym) (value.amount, msgs)
-    else mdPriceFn(sym) match {
+     else mdPriceFn(sym) match {
       case Some(px) if px != 0 => (value.amount / px, msgs)
       case _ => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(value.amount)} ${value.currency} to quantity")
     }
@@ -131,17 +131,22 @@ class PortfolioManager() {
 
         if (qty > 0) {
           val cur = st.positions.withDefaultValue(BigDecimal(0))(sym)
-          val next = d.cmd.action match {
-            case ast.Buy  => cur + qty
-            case ast.Sell => (cur - qty).max(BigDecimal(0))
+          d.cmd.action match {
+            case ast.Buy =>
+              val next = cur + qty
+              if (next != cur) (st.copy(positions = st.positions.updated(sym, next)), appl + 1, msgs2)
+              else (st, appl, msgs2 :+ s" ! Skipping BUY for $sym - no net change (qty=${fmt(qty)})")
+            case ast.Sell =>
+              if (cur == 0)
+                (st, appl, msgs2 :+ s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
+              else if (qty > cur)
+                (st, appl, msgs2 :+ s" ! Skipping SELL ${fmt(qty)} $sym - insufficient holdings (have ${fmt(cur)})")
+              else {
+                val next = cur - qty
+                if (next != cur) (st.copy(positions = st.positions.updated(sym, next)), appl + 1, msgs2)
+                else (st, appl, msgs2 :+ s" ! Skipping SELL for $sym - no net change (qty=${fmt(qty)})")
+              }
           }
-
-          if (next != cur) {
-            if (d.cmd.action == ast.Sell && cur == 0)
-              (st, appl, msgs2 :+ s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
-            else
-              (st.copy(positions = st.positions.updated(sym, next)), appl + 1, msgs2)
-          } else (st, appl, msgs2 :+ s" ! Skipping ${d.cmd.action} for $sym - no net change (qty=${fmt(qty)})")
         } else (st, appl, msgs2 :+ s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
     }
 
