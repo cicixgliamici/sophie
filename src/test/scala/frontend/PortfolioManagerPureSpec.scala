@@ -37,7 +37,18 @@ class PortfolioManagerPureSpec extends AnyFunSuite {
     assert(newState.positions.isEmpty)
     assert(msgs.exists(m => m.contains("computed quantity is 0") || m.contains("Skipping SELL")))
   }
+  // Ensure SELL is skipped when holdings are insufficient for the quantity
+  test("pureApplyPlan skips sell when holdings are insufficient") {
+    val pm = new PortfolioManager()
+    val initial = PortfolioState(Map("X" -> BigDecimal(1)), BigDecimal(0))
+    val plan = ExecutionPlan(List(mkTradeDecision(Sell, "X", BigDecimal(2), "X")), None)
 
+    val (newState, applied, msgs) = pm.pureApplyPlan(Some(plan), _ => None, initial)
+    assert(applied == 0)
+    assert(newState.positions("X") == BigDecimal(1))
+    assert(msgs.exists(_.contains("insufficient holdings")))
+  }
+  
   // Preview should return the new state without mutating the original portfolio passed in
   test("purePreviewPlan does not mutate state") {
     val pm = new PortfolioManager()
