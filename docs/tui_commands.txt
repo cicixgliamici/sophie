@@ -1,21 +1,41 @@
+# Manuale rapido: ogni riga che inizia con ":" è un comando TUI.
+# Le righe vuote inviano il programma Sophie accumulato nel buffer.
+
+# Mostra la lista dei comandi disponibili e la sintassi.
 :help
+# Mostra il market data attuale in memoria (prezzi, serie, override).
 :show md
+# Imposta il prezzo corrente per un simbolo (usato per PRICE() e conversioni).
 :set price MSFT 350
+# Imposta una serie storica (SYM.FIELD) con valori CSV (es. BTC.volume).
 :set series BTC volume 100000,2000000,3000000
+# Imposta un override di indicatore (RSI/MSFT/14 -> 25), evitando il calcolo.
 :set ovr RSI MSFT 14 25
+# Carica market data da JSON (prezzi/serie/override).
 :load md src/main/resources/md_demo.json
+# Salva il market data corrente in JSON.
 :save md tmp/md_out.json
 
+# Programma Sophie: 2 trade (BUY/SELL) che verranno valutati al blank line.
 BUY 1500 EUR OF MSFT IF RSI(MSFT, 14) < 30 && MAVG(MSFT, 50) > PRICE(MSFT);
 SELL 0.5 BTC OF BTC IF BTC.volume > 1000000 && STDDEV(BTC, 20) > PRICE(BTC);
 
 
+# Resetta il portfolio in memoria (stato vuoto).
 :pf new
+# Mostra il portfolio corrente (con MTM se ci sono prezzi).
 :pf show
+# Salva il portfolio in JSON su disco.
 :pf save tmp/pf.json
+# Carica un portfolio JSON da disco.
 :pf load tmp/pf.json
+# Applica il last plan (solo trade EXECUTE) al portfolio in memoria.
 :pf apply
+# Salva l'ultimo programma Sophie su disco.
 :save prog tmp/last_prog.sophie
+# Compila il last plan in IR JSON (istruzioni eseguibili).
 :compile ir tmp/ir.json
+# Esegue l'IR e aggiorna portfolio/ledger su disco (data/).
 :exec ir tmp/ir.json
+# Esce dalla TUI.
 :q
