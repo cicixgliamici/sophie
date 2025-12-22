@@ -1,0 +1,20 @@
+:help
+:show md
+:set price MSFT 350
+:set series BTC volume 100000,2000000,3000000
+:set ovr RSI MSFT 14 25
+:load md src/main/resources/md_demo.json
+:save md tmp/md_out.json
+
+BUY 1500 EUR OF MSFT IF RSI(MSFT, 14) < 30 && MAVG(MSFT, 50) > PRICE(MSFT);
+SELL 0.5 BTC OF BTC IF BTC.volume > 1000000 && STDDEV(BTC, 20) > PRICE(BTC);
+
+:pf new
+:pf show
+:pf save tmp/pf.json
+:pf load tmp/pf.json
+:pf apply
+:save prog tmp/last_prog.sophie
+:compile ir tmp/ir.json
+:exec ir tmp/ir.json
+:q

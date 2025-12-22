@@ -1,0 +1,11 @@
+=== Ricevuta ordini eseguiti ===
+Azione    Simbolo  Quantità  Prezzo  Totale  Ora
+Comprato  MSFT            2     340     680  2025-12-21T16:45:50.084
+Venduto   MSFT            1     340     340  2025-12-21T16:45:50.089
+
+
+=== Ricevuta ordini eseguiti ===
+Azione    Simbolo  Quantità  Prezzo  Totale  Ora
+Comprato  MSFT            2     340     680  2025-12-21T16:47:08.462
+Venduto   MSFT            1     340     340  2025-12-21T16:47:08.466
+

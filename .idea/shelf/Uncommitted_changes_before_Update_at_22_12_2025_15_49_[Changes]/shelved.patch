@@ -1,0 +1,240 @@
+Index: src/main/scala/RunTuiSim.scala
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>// RunTuiSim.scala\r\n// ----------------\r\n// Runner non-interattivo per la TUI che legge gli input da `docs/tui_commands.txt`,\r\n// esegue `SophieTui.simulateSession` e scrive un report JSON in `tmp/tui_sim_report.json`.\r\n// Scopo: fornire un harness ripetibile per smoke tests / CI senza aprire la console interattiva.\r\n\r\nimport frontend.SophieTui\r\nimport java.nio.file.{Files, Paths}\r\nimport java.nio.charset.StandardCharsets.UTF_8\r\nimport scala.jdk.CollectionConverters._\r\nimport upickle.default.{write => uwrite, ReadWriter, macroRW}\r\n\r\n// Report semplice che serializziamo con upickle. I valori BigDecimal sono convertiti a stringa\r\n// per evitare problemi di serializzazione/precisione nei consumer JSON.\r\ncase class TuiSimReport(inputs: Seq[String], portfolio: Map[String, String], lastPlanPresent: Boolean)\r\nobject TuiSimReport { implicit val rw: ReadWriter[TuiSimReport] = macroRW }\r\n\r\nobject RunTuiSim {\r\n  def main(args: Array[String]): Unit = {\r\n    // percorso del file di comandi (documentato in docs/tui_commands.txt)\r\n    val path = Paths.get(\"docs/tui_commands.txt\")\r\n    if (!Files.exists(path)) {\r\n      System.err.println(s\"File not found: ${path.toString}\")\r\n      System.exit(2)\r\n    }\r\n\r\n    // leggiamo le righe così come sono (inclusi i comandi e i blocchi program)\r\n    val lines = Files.readAllLines(path).asScala.toSeq\r\n\r\n    // Eseguiamo la simulazione: non apre la console, ritorna l'ultimo portfolio e il lastPlan\r\n    val (portfolio, lastPlanOpt) = SophieTui.simulateSession(lines)\r\n\r\n    // Convertiamo i BigDecimal in stringhe per serializzare coerentemente nel JSON\r\n    val portfolioStr = portfolio.map { case (k, v) => k -> v.toString }\r\n\r\n    val report = TuiSimReport(inputs = lines, portfolio = portfolioStr, lastPlanPresent = lastPlanOpt.isDefined)\r\n\r\n    // Assicuriamoci che la cartella tmp esista e scriviamo il report in UTF-8\r\n    val outDir = Paths.get(\"tmp\")\r\n    if (!Files.exists(outDir)) Files.createDirectories(outDir)\r\n    val outPath = outDir.resolve(\"tui_sim_report.json\")\r\n\r\n    // Scriviamo il JSON con indentazione per facilità di lettura\r\n    val json = uwrite(report, indent = 2)\r\n    Files.writeString(outPath, json, UTF_8)\r\n\r\n    // Stampe di sintesi: utili per log e diagnostica automatica\r\n    println(s\"Wrote report to ${outPath.toString}\")\r\n    println(\"=== Summary ===\")\r\n    println(s\"Inputs: ${lines.length} lines\")\r\n    println(s\"Last plan present: ${lastPlanOpt.isDefined}\")\r\n    println(\"Final portfolio positions:\")\r\n    if (portfolio.isEmpty) println(\" - (empty)\")\r\n    else portfolio.foreach { case (sym, bd) => println(s\" - $sym -> $bd\") }\r\n  }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/scala/RunTuiSim.scala b/src/main/scala/RunTuiSim.scala
+--- a/src/main/scala/RunTuiSim.scala	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
++++ b/src/main/scala/RunTuiSim.scala	(date 1766414946929)
+@@ -18,7 +18,7 @@
+ object RunTuiSim {
+   def main(args: Array[String]): Unit = {
+     // percorso del file di comandi (documentato in docs/tui_commands.txt)
+-    val path = Paths.get("docs/tui_commands.txt")
++    val path = Paths.get("docs/tui_commandsUncommented.txt")
+     if (!Files.exists(path)) {
+       System.err.println(s"File not found: ${path.toString}")
+       System.exit(2)
+Index: .idea/copilot.data.migration.agent.xml
+===================================================================
+diff --git a/.idea/copilot.data.migration.agent.xml b/.idea/copilot.data.migration.agent.xml
+deleted file mode 100644
+--- a/.idea/copilot.data.migration.agent.xml	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
++++ /dev/null	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
+@@ -1,6 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<project version="4">
+-  <component name="AgentMigrationStateService">
+-    <option name="migrationStatus" value="COMPLETED" />
+-  </component>
+-</project>
+\ No newline at end of file
+Index: .idea/copilot.data.migration.ask2agent.xml
+===================================================================
+diff --git a/.idea/copilot.data.migration.ask2agent.xml b/.idea/copilot.data.migration.ask2agent.xml
+deleted file mode 100644
+--- a/.idea/copilot.data.migration.ask2agent.xml	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
++++ /dev/null	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
+@@ -1,6 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<project version="4">
+-  <component name="Ask2AgentMigrationStateService">
+-    <option name="migrationStatus" value="COMPLETED" />
+-  </component>
+-</project>
+\ No newline at end of file
+Index: .idea/copilot.data.migration.ask.xml
+===================================================================
+diff --git a/.idea/copilot.data.migration.ask.xml b/.idea/copilot.data.migration.ask.xml
+deleted file mode 100644
+--- a/.idea/copilot.data.migration.ask.xml	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
++++ /dev/null	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
+@@ -1,6 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<project version="4">
+-  <component name="AskMigrationStateService">
+-    <option name="migrationStatus" value="COMPLETED" />
+-  </component>
+-</project>
+\ No newline at end of file
+Index: .idea/copilot.data.migration.edit.xml
+===================================================================
+diff --git a/.idea/copilot.data.migration.edit.xml b/.idea/copilot.data.migration.edit.xml
+deleted file mode 100644
+--- a/.idea/copilot.data.migration.edit.xml	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
++++ /dev/null	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
+@@ -1,6 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<project version="4">
+-  <component name="EditMigrationStateService">
+-    <option name="migrationStatus" value="COMPLETED" />
+-  </component>
+-</project>
+\ No newline at end of file
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"AutoImportSettings\">\r\n    <option name=\"autoReloadType\" value=\"SELECTIVE\" />\r\n  </component>\r\n  <component name=\"ChangeListManager\">\r\n    <list default=\"true\" id=\"ea56d377-2d07-4eca-8a76-67aaa0121dc7\" name=\"Changes\" comment=\"V0.2\">\r\n      <change afterPath=\"$PROJECT_DIR$/examples/cli_buy_sell.sophie\" afterDir=\"false\" />\r\n      <change afterPath=\"$PROJECT_DIR$/scripts/run_cli_example.sh\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/data/ledger.ndjson\" beforeDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/data/portfolio.json\" beforeDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/docs/tui_commands.txt\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/docs/tui_commands.txt\" afterDir=\"false\" />\r\n    </list>\r\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\r\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\r\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\r\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\r\n  </component>\r\n  <component name=\"ExternalProjectsData\">\r\n    <projectState path=\"$PROJECT_DIR$\">\r\n      <ProjectState />\r\n    </projectState>\r\n  </component>\r\n  <component name=\"ExternalProjectsManager\">\r\n    <system id=\"SBT\">\r\n      <state>\r\n        <projects_view>\r\n          <tree_state>\r\n            <expand>\r\n              <path>\r\n                <item name=\"\" type=\"6a2764b6:ExternalProjectsStructure$RootNode\" />\r\n                <item name=\"Sophie\" type=\"f1a62948:ProjectNode\" />\r\n              </path>\r\n            </expand>\r\n            <select />\r\n          </tree_state>\r\n        </projects_view>\r\n      </state>\r\n    </system>\r\n  </component>\r\n  <component name=\"FileTemplateManagerImpl\">\r\n    <option name=\"RECENT_TEMPLATES\">\r\n      <list>\r\n        <option value=\"Scala Worksheet\" />\r\n      </list>\r\n    </option>\r\n  </component>\r\n  <component name=\"Git.Settings\">\r\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\r\n  </component>\r\n  <component name=\"GitHubPullRequestSearchHistory\">{\r\n  &quot;lastFilter&quot;: {\r\n    &quot;state&quot;: &quot;OPEN&quot;,\r\n    &quot;assignee&quot;: &quot;cicixgliamici&quot;\r\n  }\r\n}</component>\r\n  <component name=\"GithubPullRequestsUISettings\">{\r\n  &quot;selectedUrlAndAccountId&quot;: {\r\n    &quot;url&quot;: &quot;https://github.com/cicixgliamici/sophie.git&quot;,\r\n    &quot;accountId&quot;: &quot;f5dbce4b-2a3e-4ec3-af03-c4edb08bf244&quot;\r\n  }\r\n}</component>\r\n  <component name=\"ProblemsViewState\">\r\n    <option name=\"selectedTabId\" value=\"CurrentFile\" />\r\n  </component>\r\n  <component name=\"ProjectCodeStyleSettingsMigration\">\r\n    <option name=\"version\" value=\"2\" />\r\n  </component>\r\n  <component name=\"ProjectColorInfo\">{\r\n  &quot;associatedIndex&quot;: 5\r\n}</component>\r\n  <component name=\"ProjectId\" id=\"31bFDSc77EXEKzeR0mgJvHf9QjT\" />\r\n  <component name=\"ProjectViewState\">\r\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\r\n    <option name=\"showLibraryContents\" value=\"true\" />\r\n  </component>\r\n  <component name=\"PropertiesComponent\">{\r\n  &quot;keyToString&quot;: {\r\n    &quot;Application.Main.executor&quot;: &quot;Run&quot;,\r\n    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,\r\n    &quot;git-widget-placeholder&quot;: &quot;master&quot;,\r\n    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,\r\n    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,\r\n    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,\r\n    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,\r\n    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,\r\n    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,\r\n    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,\r\n    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,\r\n    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,\r\n    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,\r\n    &quot;settings.editor.selected.configurable&quot;: &quot;configurable.group.appearance&quot;,\r\n    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;\r\n  },\r\n  &quot;keyToStringList&quot;: {\r\n    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [\r\n      &quot;PLAIN_TEXT&quot;\r\n    ]\r\n  }\r\n}</component>\r\n  <component name=\"RecentsManager\">\r\n    <key name=\"MoveFile.RECENT_KEYS\">\r\n      <recent name=\"C:\\Progetti\\Sophie\\docs\" />\r\n      <recent name=\"C:\\Progetti\\Sophie\\src\\test\\scala\\frontend\" />\r\n      <recent name=\"C:\\Progetti\\Sophie\\src\\test\\scala\\engine\" />\r\n      <recent name=\"C:\\Progetti\\Sophie\\src\\test\\resources\\programs\" />\r\n    </key>\r\n  </component>\r\n  <component name=\"RunManager\">\r\n    <configuration name=\"Main\" type=\"Application\" factoryName=\"Application\" temporary=\"true\">\r\n      <option name=\"MAIN_CLASS_NAME\" value=\"Main\" />\r\n      <module name=\"sophie.main\" />\r\n      <method v=\"2\">\r\n        <option name=\"Make\" enabled=\"true\" />\r\n      </method>\r\n    </configuration>\r\n    <recent_temporary>\r\n      <list>\r\n        <item itemvalue=\"Application.Main\" />\r\n      </list>\r\n    </recent_temporary>\r\n  </component>\r\n  <component name=\"ScalaProjectSettings\">\r\n    <option name=\"migrateConfigurationsNotificationShown\" value=\"true\" />\r\n    <option name=\"scala3DisclaimerShown\" value=\"true\" />\r\n  </component>\r\n  <component name=\"SharedIndexes\">\r\n    <attachedChunks>\r\n      <set>\r\n        <option value=\"bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.28539.13\" />\r\n        <option value=\"bundled-js-predefined-d6986cc7102b-a71380e98a7c-JavaScript-IU-252.28539.13\" />\r\n      </set>\r\n    </attachedChunks>\r\n  </component>\r\n  <component name=\"TaskManager\">\r\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\r\n      <changelist id=\"ea56d377-2d07-4eca-8a76-67aaa0121dc7\" name=\"Changes\" comment=\"\" />\r\n      <created>1755784750471</created>\r\n      <option name=\"number\" value=\"Default\" />\r\n      <option name=\"presentableId\" value=\"Default\" />\r\n      <updated>1755784750471</updated>\r\n      <workItem from=\"1755784896649\" duration=\"280000\" />\r\n      <workItem from=\"1755955350386\" duration=\"1780000\" />\r\n      <workItem from=\"1757263282693\" duration=\"534000\" />\r\n      <workItem from=\"1757263966244\" duration=\"5456000\" />\r\n      <workItem from=\"1757353149344\" duration=\"25000\" />\r\n      <workItem from=\"1757353197895\" duration=\"1415000\" />\r\n      <workItem from=\"1757354667131\" duration=\"703000\" />\r\n      <workItem from=\"1757524472280\" duration=\"895000\" />\r\n      <workItem from=\"1757525439512\" duration=\"5986000\" />\r\n      <workItem from=\"1757859067049\" duration=\"11838000\" />\r\n      <workItem from=\"1758460152946\" duration=\"647000\" />\r\n      <workItem from=\"1758460915122\" duration=\"11297000\" />\r\n      <workItem from=\"1759587880308\" duration=\"16317000\" />\r\n      <workItem from=\"1765903981933\" duration=\"474000\" />\r\n      <workItem from=\"1765904837736\" duration=\"4461000\" />\r\n      <workItem from=\"1765981517069\" duration=\"10895000\" />\r\n      <workItem from=\"1766057199074\" duration=\"9586000\" />\r\n      <workItem from=\"1766085600899\" duration=\"5834000\" />\r\n      <workItem from=\"1766152986192\" duration=\"11361000\" />\r\n      <workItem from=\"1766326928996\" duration=\"2744000\" />\r\n    </task>\r\n    <task id=\"LOCAL-00001\" summary=\"Test!\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1765905903671</created>\r\n      <option name=\"number\" value=\"00001\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00001\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1765905903672</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00002\" summary=\"Prime modifiche\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1765909461571</created>\r\n      <option name=\"number\" value=\"00002\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00002\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1765909461571</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00003\" summary=\"Prime modifiche\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1765909495624</created>\r\n      <option name=\"number\" value=\"00003\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00003\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1765909495624</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00004\" summary=\"Fat Jar\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1765986005860</created>\r\n      <option name=\"number\" value=\"00004\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00004\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1765986005860</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00005\" summary=\"TUI funzionante\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1765992554610</created>\r\n      <option name=\"number\" value=\"00005\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00005\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1765992554610</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00006\" summary=\"TUI funzionante e Test 50%\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1766069701904</created>\r\n      <option name=\"number\" value=\"00006\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00006\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1766069701904</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00007\" summary=\"Commentini\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1766091511397</created>\r\n      <option name=\"number\" value=\"00007\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00007\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1766091511398</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00008\" summary=\"Più test e logger\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1766155562062</created>\r\n      <option name=\"number\" value=\"00008\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00008\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1766155562062</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00009\" summary=\"V0.2\">\r\n      <option name=\"closed\" value=\"true\" />\r\n      <created>1766327583270</created>\r\n      <option name=\"number\" value=\"00009\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00009\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1766327583270</updated>\r\n    </task>\r\n    <option name=\"localTasksCounter\" value=\"10\" />\r\n    <servers />\r\n  </component>\r\n  <component name=\"TypeScriptGeneratedFilesManager\">\r\n    <option name=\"version\" value=\"3\" />\r\n  </component>\r\n  <component name=\"VcsManagerConfiguration\">\r\n    <MESSAGE value=\"Test!\" />\r\n    <MESSAGE value=\"Prime modifiche\" />\r\n    <MESSAGE value=\"Fat Jar\" />\r\n    <MESSAGE value=\"TUI funzionante\" />\r\n    <MESSAGE value=\"TUI funzionante e Test 50%\" />\r\n    <MESSAGE value=\"Commentini\" />\r\n    <MESSAGE value=\"Più test e logger\" />\r\n    <MESSAGE value=\"V0.2\" />\r\n    <option name=\"LAST_COMMIT_MESSAGE\" value=\"V0.2\" />\r\n  </component>\r\n  <component name=\"github-copilot-workspace\">\r\n    <instructionFileLocations>\r\n      <option value=\".github/instructions\" />\r\n    </instructionFileLocations>\r\n    <promptFileLocations>\r\n      <option value=\".github/prompts\" />\r\n    </promptFileLocations>\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision 8b84c0677c3f1ee94f5e7ab26eb2e394f26a9f8d)
++++ b/.idea/workspace.xml	(date 1766414926834)
+@@ -5,11 +5,12 @@
+   </component>
+   <component name="ChangeListManager">
+     <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="V0.2">
+-      <change afterPath="$PROJECT_DIR$/examples/cli_buy_sell.sophie" afterDir="false" />
+-      <change afterPath="$PROJECT_DIR$/scripts/run_cli_example.sh" afterDir="false" />
+-      <change beforePath="$PROJECT_DIR$/data/ledger.ndjson" beforeDir="false" />
+-      <change beforePath="$PROJECT_DIR$/data/portfolio.json" beforeDir="false" />
+-      <change beforePath="$PROJECT_DIR$/docs/tui_commands.txt" beforeDir="false" afterPath="$PROJECT_DIR$/docs/tui_commands.txt" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/docs/tui_commandsUncommented.txt" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.agent.xml" beforeDir="false" />
++      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.ask.xml" beforeDir="false" />
++      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.ask2agent.xml" beforeDir="false" />
++      <change beforePath="$PROJECT_DIR$/.idea/copilot.data.migration.edit.xml" beforeDir="false" />
++      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+     </list>
+     <option name="SHOW_DIALOG" value="false" />
+     <option name="HIGHLIGHT_CONFLICTS" value="true" />
+@@ -74,33 +75,34 @@
+     <option name="hideEmptyMiddlePackages" value="true" />
+     <option name="showLibraryContents" value="true" />
+   </component>
+-  <component name="PropertiesComponent">{
+-  &quot;keyToString&quot;: {
+-    &quot;Application.Main.executor&quot;: &quot;Run&quot;,
+-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+-    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+-    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+-    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+-    &quot;settings.editor.selected.configurable&quot;: &quot;configurable.group.appearance&quot;,
+-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
++  <component name="PropertiesComponent"><![CDATA[{
++  "keyToString": {
++    "Application.Main.executor": "Run",
++    "ModuleVcsDetector.initialDetectionPerformed": "true",
++    "RunOnceActivity.ShowReadmeOnStart": "true",
++    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
++    "RunOnceActivity.git.unshallow": "true",
++    "git-widget-placeholder": "master",
++    "ignore.virus.scanning.warn.message": "true",
++    "kotlin-language-version-configured": "true",
++    "last_opened_file_path": "C:/Progetti/Sophie/docs",
++    "node.js.detected.package.eslint": "true",
++    "node.js.detected.package.tslint": "true",
++    "node.js.selected.package.eslint": "(autodetect)",
++    "node.js.selected.package.tslint": "(autodetect)",
++    "nodejs_package_manager_path": "npm",
++    "project.structure.last.edited": "Modules",
++    "project.structure.proportion": "0.0",
++    "project.structure.side.proportion": "0.0",
++    "settings.editor.selected.configurable": "configurable.group.appearance",
++    "vue.rearranger.settings.migration": "true"
+   },
+-  &quot;keyToStringList&quot;: {
+-    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
+-      &quot;PLAIN_TEXT&quot;
++  "keyToStringList": {
++    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
++      "PLAIN_TEXT"
+     ]
+   }
+-}</component>
++}]]></component>
+   <component name="RecentsManager">
+     <key name="MoveFile.RECENT_KEYS">
+       <recent name="C:\Progetti\Sophie\docs" />
+@@ -161,7 +163,8 @@
+       <workItem from="1766057199074" duration="9586000" />
+       <workItem from="1766085600899" duration="5834000" />
+       <workItem from="1766152986192" duration="11361000" />
+-      <workItem from="1766326928996" duration="2744000" />
++      <workItem from="1766326928996" duration="4947000" />
++      <workItem from="1766414442111" duration="479000" />
+     </task>
+     <task id="LOCAL-00001" summary="Test!">
+       <option name="closed" value="true" />
+@@ -235,7 +238,15 @@
+       <option name="project" value="LOCAL" />
+       <updated>1766327583270</updated>
+     </task>
+-    <option name="localTasksCounter" value="10" />
++    <task id="LOCAL-00010" summary="V0.2">
++      <option name="closed" value="true" />
++      <created>1766329730551</created>
++      <option name="number" value="00010" />
++      <option name="presentableId" value="LOCAL-00010" />
++      <option name="project" value="LOCAL" />
++      <updated>1766329730551</updated>
++    </task>
++    <option name="localTasksCounter" value="11" />
+     <servers />
+   </component>
+   <component name="TypeScriptGeneratedFilesManager">
+Index: docs/tui_commandsUncommented.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/docs/tui_commandsUncommented.txt b/docs/tui_commandsUncommented.txt
+new file mode 100644
+--- /dev/null	(date 1766329709022)
++++ b/docs/tui_commandsUncommented.txt	(date 1766329709022)
+@@ -0,0 +1,41 @@
++# Manuale rapido: ogni riga che inizia con ":" è un comando TUI.
++# Le righe vuote inviano il programma Sophie accumulato nel buffer.
++
++# Mostra la lista dei comandi disponibili e la sintassi.
++:help
++# Mostra il market data attuale in memoria (prezzi, serie, override).
++:show md
++# Imposta il prezzo corrente per un simbolo (usato per PRICE() e conversioni).
++:set price MSFT 350
++# Imposta una serie storica (SYM.FIELD) con valori CSV (es. BTC.volume).
++:set series BTC volume 100000,2000000,3000000
++# Imposta un override di indicatore (RSI/MSFT/14 -> 25), evitando il calcolo.
++:set ovr RSI MSFT 14 25
++# Carica market data da JSON (prezzi/serie/override).
++:load md src/main/resources/md_demo.json
++# Salva il market data corrente in JSON.
++:save md tmp/md_out.json
++
++# Programma Sophie: 2 trade (BUY/SELL) che verranno valutati al blank line.
++BUY 1500 EUR OF MSFT IF RSI(MSFT, 14) < 30 && MAVG(MSFT, 50) > PRICE(MSFT);
++SELL 0.5 BTC OF BTC IF BTC.volume > 1000000 && STDDEV(BTC, 20) > PRICE(BTC);
++
++
++# Resetta il portfolio in memoria (stato vuoto).
++:pf new
++# Mostra il portfolio corrente (con MTM se ci sono prezzi).
++:pf show
++# Salva il portfolio in JSON su disco.
++:pf save tmp/pf.json
++# Carica un portfolio JSON da disco.
++:pf load tmp/pf.json
++# Applica il last plan (solo trade EXECUTE) al portfolio in memoria.
++:pf apply
++# Salva l'ultimo programma Sophie su disco.
++:save prog tmp/last_prog.sophie
++# Compila il last plan in IR JSON (istruzioni eseguibili).
++:compile ir tmp/ir.json
++# Esegue l'IR e aggiorna portfolio/ledger su disco (data/).
++:exec ir tmp/ir.json
++# Esce dalla TUI.
++:q

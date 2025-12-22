@@ -1,0 +1,6 @@
+{"ts":1766330285113,"action":"BUY","symbol":"MSFT","qty":"2","price":"320.0","notional":"640.0","source":"cli","note":"BUY 2 MSFT OF MSFT - condition met"}
+{"ts":1766330285126,"action":"SELL","symbol":"MSFT","qty":"1","price":"320.0","notional":"320.0","source":"cli","note":"SELL 1 MSFT OF MSFT - condition met"}
+{"ts":1766331950084,"action":"BUY","symbol":"MSFT","qty":"2","price":"340.0","notional":"680.0","source":"cli","note":"BUY 2 MSFT OF MSFT - condition met"}
+{"ts":1766331950089,"action":"SELL","symbol":"MSFT","qty":"1","price":"340.0","notional":"340.0","source":"cli","note":"SELL 1 MSFT OF MSFT - condition met"}
+{"ts":1766332028462,"action":"BUY","symbol":"MSFT","qty":"2","price":"340.0","notional":"680.0","source":"cli","note":"BUY 2 MSFT OF MSFT - condition met"}
+{"ts":1766332028466,"action":"SELL","symbol":"MSFT","qty":"1","price":"340.0","notional":"340.0","source":"cli","note":"SELL 1 MSFT OF MSFT - condition met"}

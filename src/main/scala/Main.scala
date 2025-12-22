@@ -1,6 +1,6 @@
+import ast.*
+import engine.*
 import frontend.SophieParserFacade
-import ast._
-import engine._
 import util.SLF4JLogger
 
 object Main {
