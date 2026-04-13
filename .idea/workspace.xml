@@ -4,12 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="V0.2">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/ledger.ndjson" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/portfolio.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/integration/RunIntegrationRunner.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/integration/RunIntegrationRunner.scala" afterDir="false" />
-    </list>
+    <list default="true" id="ea56d377-2d07-4eca-8a76-67aaa0121dc7" name="Changes" comment="V0.2" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -242,7 +237,15 @@
       <option name="project" value="LOCAL" />
       <updated>1766417725767</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="V0.2">
+      <option name="closed" value="true" />
+      <created>1766420241505</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1766420241505</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
