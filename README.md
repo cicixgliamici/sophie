@@ -88,6 +88,16 @@ If you want to evaluate the repository quickly, the best path is:
 
 ---
 
+## What this project demonstrates
+
+* DSL design and syntax engineering
+* parser-driven architecture with ANTLR
+* typed AST construction
+* evaluation and execution pipeline design
+* separation between core logic and side effects
+
+---
+
 ## Architecture at a glance
 
 Sophie is organized in layered components:
@@ -213,8 +223,8 @@ Example demo market data is available at:
 
 Additional project documentation is available in `docs/`, including:
 
-* language overview and architecture notes,
-* DSL/ANTLR rationale,
-* TUI command behavior and execution pipeline,
-* storage and persistence behavior,
-* developer quick commands.
+* language overview and architecture notes
+* DSL/ANTLR rationale
+* TUI command behavior and execution pipeline
+* storage and persistence behavior
+* developer quick commands
