@@ -39,6 +39,7 @@ build/
 
 ### VS Code ###
 .vscode/
+.metals/
 
 ### Mac OS ###
 .DS_Store
@@ -46,3 +47,8 @@ build/
 ### Scala ###
 .bsp/
 .bloop/
+.sbtboot/
+.ivy2/
+.coursier-cache/
+project/metals.sbt
+project/project/

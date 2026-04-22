@@ -41,6 +41,22 @@ object Instruction {
 }
 
 object Lowering {
+  // Convert the parsed trade shape into an executable quantity.
+  // Explicit quantities pass through unchanged, while notional values need
+  // a market price unless they are already denominated in the traded symbol.
+  private def quantityFor(cmd: TradeCmd, md: MarketData): Either[String, BigDecimal] =
+    cmd.consideration match {
+      case ByQuantity(qty) => Right(qty)
+      case ByValue(value) if value.currency == cmd.symbol =>
+        Right(value.amount)
+      case ByValue(value) =>
+        md.price(cmd.symbol) match {
+          case Some(px) if px != 0 => Right(value.amount / px)
+          case Some(_)             => Left(s"PRICE(${cmd.symbol}) is zero")
+          case None                => Left(s"Missing PRICE(${cmd.symbol}) to convert ${value.amount} ${value.currency} to qty")
+        }
+    }
+
   /** Convert an ExecutionPlan into concrete Instructions (filters EXECUTE only).
     * Returns an Either: Left(errorMessage) if lowering failed, or Right(listOfInstructions) on success.
     */
@@ -51,13 +67,7 @@ object Lowering {
     def toInstr(decIdx: (TradeDecision, Int)): Either[String, Instruction] = {
       val (dec, idx) = decIdx
       val cmd = dec.cmd
-      val qtyE: Either[String, BigDecimal] =
-        if (cmd.value.currency == cmd.symbol) Right(cmd.value.amount)
-        else md.price(cmd.symbol) match {
-          case Some(px) if px != 0 => Right(cmd.value.amount / px)
-          case Some(_)             => Left(s"PRICE(${cmd.symbol}) is zero")
-          case None                => Left(s"Missing PRICE(${cmd.symbol}) to convert ${cmd.value.amount} ${cmd.value.currency} to qty")
-        }
+      val qtyE = quantityFor(cmd, md)
 
       qtyE.map { qty =>
         val id = s"$source-$idx-${System.nanoTime()}"

@@ -1,12 +1,11 @@
 package cli
 
 import java.nio.file.{Files, Path, Paths}
-import scala.jdk.CollectionConverters._
 
 import upickle.default._
 
 import frontend.MdJsonCodec._
-import frontend.SophieParserFacade
+import frontend.ProgramEvaluator
 import frontend.PortfolioJson._
 import engine.{InMemoryMarketData, Lowering, Executor, FileLedger, FileJsonPortfolioStore}
 import engine._
@@ -57,8 +56,8 @@ object SophieCli {
     } else {
       try {
         // 1) Load program
-        val program = config.sophieFile match {
-          case Some(p) => SophieParserFacade.parseFile(p)
+        val programSource = config.sophieFile match {
+          case Some(p) => Files.readString(p)
           case None    =>
             SLF4JLogger.error("No input file provided. Use --file <path> or --demo for the sample in resources.")
             sys.exit(2)
@@ -87,10 +86,12 @@ object SophieCli {
           }
 
           // 3) Evaluate program
-          val plan = engine.Evaluator.evaluate(program, md)
+          val evaluation = ProgramEvaluator.evaluate(programSource, md)
+          val plan = evaluation.plan
 
           // Print a readable plan
           println("=== Execution Plan ===")
+          evaluation.warnings.foreach(w => println(s"[Warning] $w"))
           plan.trades.foreach { d =>
             val status = if (d.shouldExecute) "EXECUTE" else "SKIP"
             println(s" - [$status] ${d.detail}")

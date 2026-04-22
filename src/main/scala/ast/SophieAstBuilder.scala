@@ -73,7 +73,7 @@ object SophieAstBuilder {
   // ---------- Trade ----------
   /**
     * Converts a Trade_cmdContext into a TradeCmd AST node.
-    * Handles BUY/SELL actions, value, symbol, and the required condition.
+    * Handles BUY/SELL actions, consideration, symbol, and the required condition.
     */
   private def fromTrade(ctx: Trade_cmdContext): TradeCmd = {
     val action = Option(ctx.BUY()).map(_ => Buy)
@@ -100,20 +100,19 @@ object SophieAstBuilder {
     //  - Imperative: one might parse tokens while mutating a shared structure or
     //    using indexes into token arrays; error handling and branching tend to
     //    interleave with parsing logic, making unit testing harder.
+    // Keep the two trade forms explicit in the AST:
+    // `NUMBER CURRENCY` becomes `ByValue`, while `QTY NUMBER` becomes `ByQuantity`.
     val cons = ctx.consideration()
-    val sym = symbolText(ctx.symbol())
-
-    val v = Option(cons.value()).map(fromValue)
+    val consideration = Option(cons.value()).map(v => ByValue(fromValue(v)): TradeConsideration)
       .orElse(Option(cons.quantity()).map { q =>
-        // Quantity is specified as `QTY <NUMBER>`; treat it as a Value with currency == symbol
         val num = firstTokenOf(q, sophieParser.NUMBER)
-        Value(BigDecimal(num), sym)
+        ByQuantity(BigDecimal(num)): TradeConsideration
       })
       .getOrElse(throw new IllegalArgumentException("Missing consideration (value or quantity)"))
 
     val cond = Option(ctx.condition()).map(fromCondition).getOrElse(AlwaysTrue)
 
-    TradeCmd(action = action, value = v, symbol = sym, condition = cond)
+    TradeCmd(action = action, consideration = consideration, symbol = symbolText(ctx.symbol()), condition = cond)
   }
 
   // ---------- Portfolio ----------

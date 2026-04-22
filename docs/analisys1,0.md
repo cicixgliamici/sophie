@@ -39,7 +39,7 @@
   - `src/main/scala/ast/SophieAstBuilder.scala`  
   - `src/main/scala/ast/AST.scala`
 - Evaluate AST to a high-level `ExecutionPlan`  
-  - `src/main/scala/engine/Evalutator.scala`
+  - `src/main/scala/engine/Evaluator.scala`
 - Lower execution plan to serializable instructions (IR)  
   - `src/main/scala/engine/IR.scala`
 - Execute instructions, update portfolio, append ledger  
@@ -72,7 +72,7 @@ The repository follows a classic layered compiler/runtime pipeline.
 
 - `engine.Evaluator` interprets AST against `MarketData` and creates an `ExecutionPlan`.  
   References:
-  - `src/main/scala/engine/Evalutator.scala`
+  - `src/main/scala/engine/Evaluator.scala`
   - `src/main/scala/engine/MarketData.scala`
 
 ### Lowering (IR)
@@ -129,7 +129,7 @@ Imperative elements appear in file I/O, console I/O, and a few `var` uses mainly
 
 Sources:
 - `src/main/scala/ast/AST.scala`
-- `src/main/scala/engine/Evalutator.scala`
+- `src/main/scala/engine/Evaluator.scala`
 - `src/main/scala/engine/IR.scala`
 - `src/main/scala/frontend/PortfolioManager.scala`
 - `src/main/scala/frontend/SophieTui.scala`
@@ -186,7 +186,7 @@ The AST uses `sealed trait` + `case class`, enabling immutability, pattern match
 ### 3.2 Pure transformations & stateless core
 
 - Evaluator transforms **AST → ExecutionPlan** without side effects.  
-  Source: `src/main/scala/engine/Evalutator.scala`
+  Source: `src/main/scala/engine/Evaluator.scala`
 - Lowering converts **plan → instructions** with pure data transforms.  
   Source: `src/main/scala/engine/IR.scala`
 - PortfolioManager is explicitly designed as a stateless, pure transformation layer; state is passed in/out rather than mutated internally.  
@@ -198,7 +198,7 @@ Widespread use of `.map`, `.foldLeft`, `.collect`, `.filter`, `.flatMap`, `.getO
 
 Examples:
 - Execution plan evaluation uses `.collect` and `.collectFirst`.  
-  Source: `src/main/scala/engine/Evalutator.scala`
+  Source: `src/main/scala/engine/Evaluator.scala`
 - IR lowering uses `foldRight` to accumulate results.  
   Source: `src/main/scala/engine/IR.scala`
 - Portfolio transformations use `foldLeft`.  
@@ -226,7 +226,7 @@ Sources:
 ### 4.1 Lack of a dedicated validation/effect system
 
 Errors for missing data or division by zero are thrown at runtime (exceptions), rather than being modeled with `Either`, `Validated`, or an effect type (`IO`).  
-Source: `src/main/scala/engine/Evalutator.scala`
+Source: `src/main/scala/engine/Evaluator.scala`
 
 ### 4.2 Imperative boundaries are still significant
 
@@ -262,7 +262,7 @@ The project explicitly documents and implements stateless transformations:
   Source: `src/main/scala/frontend/PortfolioManager.scala`
 - `Evaluator`, `Lowering`, and AST components are pure with explicit inputs/outputs.  
   Sources:
-  - `src/main/scala/engine/Evalutator.scala`
+  - `src/main/scala/engine/Evaluator.scala`
   - `src/main/scala/engine/IR.scala`
   - `src/main/scala/ast/AST.scala`
 
@@ -303,13 +303,13 @@ Source: `build.sbt`
 From the code and docs, key MVP 0 limitations are:
 
 - Validation & error handling gaps: missing market data or division by zero are runtime errors; no structured validation layer.  
-  Sources: `docs/language_overview.txt`, `src/main/scala/engine/Evalutator.scala`
+  Sources: `docs/language_overview.txt`, `src/main/scala/engine/Evaluator.scala`
 - Single portfolio block limitation: only the first portfolio is honored.  
-  Sources: `docs/language_overview.txt`, `src/main/scala/engine/Evalutator.scala`
+  Sources: `docs/language_overview.txt`, `src/main/scala/engine/Evaluator.scala`
 - Limited order types: only BUY/SELL market-style instructions.  
   Sources: `docs/language_overview.txt`, `src/main/scala/engine/IR.scala`
 - Indicator set limited to `MAVG` / `EMA` / `STDDEV` / `RSI`.  
-  Sources: `docs/language_overview.txt`, `src/main/scala/engine/Evalutator.scala`
+  Sources: `docs/language_overview.txt`, `src/main/scala/engine/Evaluator.scala`
 - No real market data or broker integration; current design uses file-based inputs and in-memory data.  
   Sources: `src/main/scala/engine/MarketData.scala`, `docs/storage_and_persistence.md`
 
@@ -389,3 +389,4 @@ Source: `docs/language_overview.txt`
 While not part of the grammar, the language’s execution semantics are tied to file formats:
 - **Portfolio** state is persisted as JSON (`positions` map, optional `cash`) using `PortfolioJ`.
 - **Ledger** is persisted as NDJSON (one event per line).
+

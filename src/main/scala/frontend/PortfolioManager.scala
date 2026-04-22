@@ -90,9 +90,9 @@ class PortfolioManager() {
   }
 
   /**
-    * Compute the quantity (number of shares) corresponding to a `Value`.
-    * - If the value currency equals the symbol, interpret it as a quantity already.
-    * - Otherwise, consult market data (mdPriceFn) to convert currency to quantity.
+    * Compute the quantity (number of shares) corresponding to a trade consideration.
+    * - `ByQuantity` is already expressed in units.
+    * - `ByValue` needs price conversion unless the value currency matches the symbol.
     *
     * This helper is pure: given the same inputs it always returns the same
     * output (no side-effects). In an imperative design this conversion might
@@ -100,15 +100,19 @@ class PortfolioManager() {
     * function making the dependency explicit and testable.
     */
   private def computeQuantity(
-    value: ast.Value,
+    consideration: ast.TradeConsideration,
     sym: String,
     mdPriceFn: String => Option[BigDecimal],
     msgs: Vector[String]
   ): (BigDecimal, Vector[String]) =
-    if (value.currency == sym) (value.amount, msgs)
-     else mdPriceFn(sym) match {
-      case Some(px) if px != 0 => (value.amount / px, msgs)
-      case _ => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(value.amount)} ${value.currency} to quantity")
+    consideration match {
+      case ast.ByQuantity(qty) => (qty, msgs)
+      case ast.ByValue(value) if value.currency == sym => (value.amount, msgs)
+      case ast.ByValue(value) =>
+        mdPriceFn(sym) match {
+          case Some(px) if px != 0 => (value.amount / px, msgs)
+          case _ => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(value.amount)} ${value.currency} to quantity")
+        }
     }
 
   /**
@@ -126,8 +130,7 @@ class PortfolioManager() {
     trades.foldLeft((state, 0, Vector.empty[String])) {
       case ((st, appl, msgs), d) =>
         val sym = d.cmd.symbol
-        val v   = d.cmd.value
-        val (qty, msgs2) = computeQuantity(v, sym, mdPriceFn, msgs)
+        val (qty, msgs2) = computeQuantity(d.cmd.consideration, sym, mdPriceFn, msgs)
 
         if (qty > 0) {
           val cur = st.positions.withDefaultValue(BigDecimal(0))(sym)

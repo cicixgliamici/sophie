@@ -41,6 +41,16 @@ class EvaluatorTest extends AnyFunSuite {
     assert(d.shouldExecute)
   }
 
+  test("quantity-based trades preserve QTY wording in plan details") {
+    val src = """BUY QTY 3 OF MSFT IF 1;"""
+    val md = InMemoryMarketData()
+
+    // The evaluator should keep the explicit quantity form in user-facing plan details.
+    val d = planOf(src, md).trades.head
+    assert(d.shouldExecute)
+    assert(d.detail.contains("BUY QTY 3 OF MSFT"))
+  }
+
   test("truthy comparison: single expr acts as != 0") {
     val srcTrue  = """BUY 1 EUR OF MSFT IF PRICE(MSFT);"""
     val srcFalse = """BUY 1 EUR OF MSFT IF PRICE(MSFT);"""

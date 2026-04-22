@@ -73,4 +73,17 @@ class PortfolioManagerPureSpec extends AnyFunSuite {
     assert(applied == 0)
     assert(msgs.exists(_.contains("Missing PRICE(Y)")))
   }
+
+  test("pureApplyPlan applies explicit quantity trades without market data") {
+    val pm = new PortfolioManager()
+    val initial = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
+    // A ByQuantity trade must be applied directly, without consulting PRICE(symbol).
+    val cmd = TradeCmd(Buy, ByQuantity(BigDecimal(2.5)), "MSFT", AlwaysTrue)
+    val plan = ExecutionPlan(List(TradeDecision(cmd, shouldExecute = true, "BUY QTY 2.5 OF MSFT")), None)
+
+    val (newState, applied, msgs) = pm.pureApplyPlan(Some(plan), _ => None, initial)
+    assert(applied == 1)
+    assert(newState.positions("MSFT") == BigDecimal(2.5))
+    assert(msgs.exists(_.contains("Applied 1 trade(s)")))
+  }
 }

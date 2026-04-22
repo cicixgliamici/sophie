@@ -29,7 +29,7 @@ final case class Program(statements: List[Statement]) extends AST
 sealed trait Statement extends AST
 final case class TradeCmd(
                            action: TradeAction,
-                           value: Value,
+                           consideration: TradeConsideration,
                            symbol: String,
                            condition: Condition
                          ) extends Statement
@@ -46,6 +46,13 @@ case object Sell extends TradeAction
 // Money
 final case class Value(amount: BigDecimal, currency: String)
 final case class Allocation(value: Value, symbol: String)
+
+// Trade considerations
+// A trade can be expressed either as a notional value to convert at execution time
+// or as an explicit quantity that should be used as-is.
+sealed trait TradeConsideration extends AST
+final case class ByValue(value: Value) extends TradeConsideration
+final case class ByQuantity(quantity: BigDecimal) extends TradeConsideration
 
 // Conditions
 sealed trait Condition extends AST

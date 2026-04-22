@@ -79,7 +79,9 @@ object ProgramValidator {
   /** Validate each statement and recurse where needed. */
   private def validateStatement(stmt: Statement): Vector[ValidationDiagnostic] = stmt match {
     case t: TradeCmd     => validateCondition(t.condition)
-    case p: PortfolioCmd => p.allocations.toVector.flatMap(a => validateOperand(a.value.amount))
+    // Portfolio allocations are plain numeric amounts, so there is no operand tree
+    // to inspect here. Semantic checks for portfolio multiplicity are handled above.
+    case _: PortfolioCmd => Vector.empty
   }
 
   /** Validate logical conditions by recursively checking nested operands/conditions. */

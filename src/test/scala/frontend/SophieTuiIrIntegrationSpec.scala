@@ -7,24 +7,21 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Paths}
 
 class SophieTuiIrIntegrationSpec extends AnyFunSuite {
-
-  private val dataDir    = Paths.get("data")
-  private val pfPath     = dataDir.resolve("portfolio.json")
-  private val ledgerPath = dataDir.resolve("ledger.ndjson")
-
-  private def cleanupData(): Unit = {
-    Files.deleteIfExists(pfPath)
-    Files.deleteIfExists(ledgerPath)
-    if (Files.exists(dataDir)) {
-      val stream = Files.list(dataDir)
-      try {
-        if (!stream.iterator().hasNext) Files.deleteIfExists(dataDir)
-      } finally stream.close()
+  // Remove a temp tree created by the test. Keeping the test sandboxed inside its
+  // own temp directory avoids Windows file-lock issues on the shared ./data folder.
+  private def deleteRecursively(path: java.nio.file.Path): Unit = {
+    if (Files.isDirectory(path)) {
+      val children = Files.list(path)
+      try children.forEach(deleteRecursively)
+      finally children.close()
     }
+    Files.deleteIfExists(path)
   }
 
   test("compileIr + execIr roundtrip emits instructions, ledger entries, and portfolio state") {
-    cleanupData()
+    val dataDir = Files.createTempDirectory("sophie_tui_ir")
+    val pfPath = dataDir.resolve("portfolio.json")
+    val ledgerPath = dataDir.resolve("ledger.ndjson")
     val instrPath = Files.createTempFile("sophie_ir", ".json")
 
     try {
@@ -43,9 +40,8 @@ class SophieTuiIrIntegrationSpec extends AnyFunSuite {
       }
       assert(instrs.exists(_.symbol == "MSFT"))
 
-      // Execute the IR (simulate execIr)
-      // Ensure data directory exists (Executor/FileLedger expect it)
-      Files.createDirectories(dataDir)
+      // Execute the IR using a private temp directory so this test does not
+      // contend with other test runs over a shared `data/` location.
       val pfStore = FileJsonPortfolioStore(pfPath)
       val ledger = FileLedger(ledgerPath)
       val events = engine.Executor.run(instrs, md, pfStore, ledger, source = "test")
@@ -56,7 +52,7 @@ class SophieTuiIrIntegrationSpec extends AnyFunSuite {
       val ledgerEntries = FileLedger(ledgerPath).readAll()
       assert(ledgerEntries.exists(_.symbol == "MSFT"))
     } finally {
-      cleanupData()
+      deleteRecursively(dataDir)
       Files.deleteIfExists(instrPath)
     }
   }

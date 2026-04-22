@@ -1,5 +1,6 @@
 import ast.*
 import engine.*
+import engine.ProgramValidator
 import frontend.SophieParserFacade
 import util.SLF4JLogger
 
@@ -32,6 +33,7 @@ object Main {
     // 1) Parse -> AST
     try {
       val program: Program = SophieParserFacade.parseString(sample)
+      ProgramValidator.validateOrThrow(program)
       printer.printlnLine(program.toString)
 
       // 2) Demo market data:

@@ -5,7 +5,7 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import parser.{sophieLexer, sophieParser}
 
 class SophieAstBuilderQuantitySpec extends AnyFunSuite {
-  test("quantity consideration produces Value with currency == symbol") {
+  test("quantity consideration produces a ByQuantity AST node") {
     val src = "BUY QTY 100 OF MSFT;"
     val lex = new sophieLexer(CharStreams.fromString(src))
     val par = new sophieParser(new CommonTokenStream(lex))
@@ -14,13 +14,10 @@ class SophieAstBuilderQuantitySpec extends AnyFunSuite {
 
     val ast = SophieAstBuilder.fromProgram(prog)
     ast.statements match {
-      case List(TradeCmd(action, value, symbol, cond)) =>
+      case List(TradeCmd(action, consideration, symbol, cond)) =>
         assert(action == Buy)
         assert(symbol == "MSFT")
-        // Quantity was specified as QTY 100; we expect the AST Value to have
-        // amount=100 and currency == symbol to signal direct quantity.
-        assert(value.amount == BigDecimal(100))
-        assert(value.currency == "MSFT")
+        assert(consideration == ByQuantity(BigDecimal(100)))
       case other => fail(s"Unexpected AST: $other")
     }
   }

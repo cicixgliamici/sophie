@@ -1,5 +1,5 @@
-// RunTuiSim.scala
-// ----------------
+// TuiSimReportMain.scala
+// ----------------------
 // Runner non-interattivo per la TUI che legge gli input da `docs/tui_commands.txt`,
 // esegue `SophieTui.simulateSession` e scrive un report JSON in `tmp/tui_sim_report.json`.
 // Scopo: fornire un harness ripetibile per smoke tests / CI senza aprire la console interattiva.
@@ -15,7 +15,7 @@ import upickle.default.{write => uwrite, ReadWriter, macroRW}
 case class TuiSimReport(inputs: Seq[String], portfolio: Map[String, String], lastPlanPresent: Boolean)
 object TuiSimReport { implicit val rw: ReadWriter[TuiSimReport] = macroRW }
 
-object RunTuiSim {
+object TuiSimReportMain {
   def main(args: Array[String]): Unit = {
     // percorso del file di comandi (documentato in docs/tui_commands.txt)
     val path = Paths.get("docs/tui_commandsUncommented.txt")

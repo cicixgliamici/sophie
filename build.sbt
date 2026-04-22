@@ -4,8 +4,9 @@
 ThisBuild / version      := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.3.6"
 
-// Default main class for convenience (TUI)
-ThisBuild / mainClass := Some("TuiMain")
+// Default main class for `sbt run`.
+// Using the task-scoped key avoids the lint warning produced by `ThisBuild / mainClass`.
+Compile / run / mainClass := Some("TuiMain")
 
 // ==============================
 // sbt-antlr4 plugin
@@ -76,7 +77,7 @@ assembly / assemblyMergeStrategy := {
 // the generated classes will be under that package. Otherwise they will
 // use the default package. Prefer setting the package header for clarity.
 
-// convenience alias to run the TUI simulation runner without typing the full command
-// Usage: in shell: `sbt runTuiSim`  -> executes `runMain RunTuiSim`
+// convenience alias to run the TUI report generator without typing the full command
+// Usage: in shell: `sbt runTuiSim`  -> executes `runMain TuiSimReportMain`
 // Keep this alias if you want a short way to run the non-interactive simulation runner.
-addCommandAlias("runTuiSim", "runMain RunTuiSim")
+addCommandAlias("runTuiSim", "runMain TuiSimReportMain")

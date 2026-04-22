@@ -1,7 +1,6 @@
 package cli
 
 import frontend.SophieTui
-import scala.math.BigDecimal
 
 object RunTuiSim {
   def main(args: Array[String]): Unit = {

@@ -17,7 +17,7 @@ class SophieAstBuilderTest extends AnyFunSuite {
     val expected = Program(List(
       TradeCmd(
         action = Buy,
-        value = Value(BigDecimal(1500), "EUR"),
+        consideration = ByValue(Value(BigDecimal(1500), "EUR")),
         symbol = "MSFT",
         condition = And(
           Comparison(AggFunc("RSI","MSFT",BigDecimal(14)), LT, NumberLiteral(30)),
@@ -48,7 +48,7 @@ class SophieAstBuilderTest extends AnyFunSuite {
     val ast = SophieParserFacade.parseString(src)
     val t = ast.statements.head.asInstanceOf[TradeCmd]
     assert(t.action == Buy)
-    assert(t.value == Value(BigDecimal(1500), "EUR"))
+    assert(t.consideration == ByValue(Value(BigDecimal(1500), "EUR")))
     assert(t.symbol == "MSFT")
     assert(t.condition == AlwaysTrue)
   }

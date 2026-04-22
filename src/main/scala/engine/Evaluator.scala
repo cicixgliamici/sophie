@@ -29,6 +29,10 @@ final case class PortfolioPlan(allocations: List[Allocation])
 final case class ExecutionPlan(trades: List[TradeDecision], portfolio: Option[PortfolioPlan])
 
 object Evaluator {
+  private def describeConsideration(consideration: TradeConsideration, symbol: String): String = consideration match {
+    case ByValue(value)     => s"${value.amount} ${value.currency} OF $symbol"
+    case ByQuantity(amount) => s"QTY $amount OF $symbol"
+  }
 
   /** Top-level entry: evaluate all statements. */
   def evaluate(program: Program, md: MarketData): ExecutionPlan = {
@@ -43,9 +47,10 @@ object Evaluator {
   private def decide(cmd: TradeCmd, md: MarketData): TradeDecision = {
     val ok = evalCondition(cmd.condition, md)
     val what = cmd.action match { case Buy => "BUY"; case Sell => "SELL" }
+    val target = describeConsideration(cmd.consideration, cmd.symbol)
     val reason =
-      if (ok) s"$what ${cmd.value.amount} ${cmd.value.currency} OF ${cmd.symbol} - condition met"
-      else    s"$what ${cmd.value.amount} ${cmd.value.currency} OF ${cmd.symbol} - condition NOT met"
+      if (ok) s"$what $target - condition met"
+      else    s"$what $target - condition NOT met"
     TradeDecision(cmd, ok, reason)
   }
 

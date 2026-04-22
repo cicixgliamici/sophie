@@ -45,4 +45,17 @@ class IRLoweringSpec extends AnyFunSuite {
     assert(instr.qty == BigDecimal(2))
     assert(instr.action == Buy)
   }
+
+  test("Lowering.from keeps explicit quantities without requiring prices") {
+    // This covers the new ByQuantity branch introduced by the trade-consideration refactor.
+    val cmd = TradeCmd(Buy, ByQuantity(BigDecimal(3)), "MSFT", AlwaysTrue)
+    val plan = ExecutionPlan(List(TradeDecision(cmd, shouldExecute = true, "BUY QTY 3 OF MSFT")), None)
+    val md = InMemoryMarketData()
+
+    val res = Lowering.from(plan, md, source = "test")
+    assert(res.isRight)
+    val instr = res.toOption.get.head
+    assert(instr.qty == BigDecimal(3))
+    assert(instr.symbol == "MSFT")
+  }
 }
