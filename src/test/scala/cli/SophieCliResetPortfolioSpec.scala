@@ -26,6 +26,7 @@ class SophieCliResetPortfolioSpec extends AnyFunSuite {
         "--file", "src/test/resources/programs/buy_ok.sophie",
         "--md", "src/main/resources/md_demo.json",
         "--run",
+        "--initial-cash", "1500",
         "--portfolio", portfolioPath.toString,
         "--ledger", ledgerPath.toString,
         "--reset-portfolio"

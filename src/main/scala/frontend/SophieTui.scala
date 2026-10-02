@@ -84,7 +84,7 @@ object SophieTui {
           result.log.foreach(printer.printlnLine)
           if (result.continue) loop(result.session, result.portfolio, result.buffer) else printer.printlnLine("Bye.")
         case (_, r) if r != null =>
-          // appendiamo la riga *come è stata inserita* nel buffer (preserviamo eventuali spazi interni)
+          // Preserve original input so buffering does not change spacing inside the program.
           loop(session, portfolio, buf.append(r))
         case _ => printer.printlnLine("Bye.")
       }
@@ -93,7 +93,7 @@ object SophieTui {
     loop(SessionState(InMemoryMarketData(), None, None), portfolioManager.empty, PasteBuffer.empty)
   }
 
-  // helper: normalizza la riga per rilevare comandi (rimuove BOM e caratteri di controllo invisibili)
+  // Strip invisible control characters before detecting pasted commands.
   private def normalizeForCommand(line: String): String = {
     if (line == null) null
     else line.replace("\uFEFF", "").replaceAll("\\p{C}", "").trim
@@ -112,12 +112,13 @@ object SophieTui {
       |  :help
       |  :q | :quit
       |  :show md
+      |  :explain [trade-number] - explain the last plan using its recorded values
       |  :show last
       |  :set price <SYM> <VALUE>
       |  :set series <SYM> <FIELD> <v1,...>
       |  :set ovr <NAME> <SYM> <PERIOD> <V>
       |
-      |  :pf new   - reset portfolio
+      |  :pf new [cash] [currency] - reset portfolio with explicit initial cash (default 0)
       |  :pf show  - show positions and mark-to-market (if prices available)
       |  :pf apply - apply last execution plan (EXECUTE trades only)
       |  :pf preview - preview last plan without mutating portfolio
@@ -223,7 +224,7 @@ object SophieTui {
           } catch { case e: Exception => (session, Vector(s"Error: ${e.getMessage}")) }
       }
 
-    override def execIr(session: SessionState, path: String): (SessionState, Vector[String]) =
+    override def execIr(session: SessionState, path: String, portfolio: PortfolioState): (SessionState, PortfolioState, Vector[String]) =
       try {
         val json   = Files.readString(Paths.get(path), UTF_8)
         val instrs = read[List[Instruction]](json)
@@ -232,10 +233,10 @@ object SophieTui {
         ensureParentDir("data/ledger.ndjson")
         val pfStore = FileJsonPortfolioStore(Paths.get("data/portfolio.json"))
         val ledger  = FileLedger(Paths.get("data/ledger.ndjson"))
-        val events  = Executor.run(instrs, session.md, pfStore, ledger, source = s"ir:${Paths.get(path).getFileName}")
+        val events  = Executor.run(instrs, session.md, pfStore, ledger, source = s"ir:${Paths.get(path).getFileName}", initialPortfolio = Some(portfolio))
         ReceiptPrinter.printReceipts(events)
-        (session, Vector(s"Executed ${instrs.size} instruction(s). Portfolio saved, ledger appended."))
-      } catch { case e: Exception => (session, Vector(s"Error executing IR: ${e.getMessage}")) }
+        (session, pfStore.load(), Vector(s"Executed ${instrs.size} instruction(s). Portfolio saved, ledger appended."))
+      } catch { case e: Exception => (session, portfolio, Vector(s"Error executing IR: ${e.getMessage}")) }
 
     override def evalBuffer(session: SessionState, buf: PasteBuffer): (SessionState, Vector[String]) =
       evalAndCollect(buf.result, session)
@@ -309,7 +310,7 @@ object SophieTui {
     * execution plan produced. Tests call this helper to assert behaviour.
     *
     * Example usage in tests:
-    *   val inputs = Seq(":set price MSFT 350", "BUY 100 EUR OF MSFT;", "", ":pf apply")
+    *   val inputs = Seq(":pf new 1000 EUR", ":set price MSFT 350", "BUY 100 EUR OF MSFT;", "", ":pf apply")
     *   val (portfolio, lastPlan) = SophieTui.simulateSession(inputs)
     *
     * This keeps the interactive loop separate from automated tests (no

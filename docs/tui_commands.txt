@@ -22,7 +22,7 @@ SELL 0.5 BTC OF BTC IF BTC.volume > 1000000 && STDDEV(BTC, 20) > PRICE(BTC);
 
 
 # Resetta il portfolio in memoria (stato vuoto).
-:pf new
+:pf new 10000 EUR
 # Mostra il portfolio corrente (con MTM se ci sono prezzi).
 :pf show
 # Salva il portfolio in JSON su disco.

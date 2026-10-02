@@ -13,7 +13,7 @@ import upickle.default._
   * Design notes:
   *   - `Instruction` is intentionally data-only: no side effects, easy to persist.
   *   - `Lowering.from` filters out SKIP trades, converts money amounts to share
-  *     quantities, and tags each instruction with a deterministic-ish id for
+  *     quantities, and tags each instruction with a stable plan-local id for
   *     traceability.
   *   - JSON codecs are defined locally so the IR stays self-contained and can be
   *     used by CLI tools or tests without importing unrelated modules.
@@ -24,7 +24,9 @@ final case class Instruction(
                               symbol: String,
                               qty: BigDecimal,            // quantity to move (not money)
                               price: Option[BigDecimal],  // optional fixed price; if None, resolve at execution
-                              note: String
+                              note: String,
+                              currency: Option[String] = None, // None means quantity in account quote units
+                              explanation: Option[ConditionTrace] = None
                             )
 
 object Instruction {
@@ -51,8 +53,11 @@ object Lowering {
         Right(value.amount)
       case ByValue(value) =>
         md.price(cmd.symbol) match {
-          case Some(px) if px != 0 => Right(value.amount / px)
-          case Some(_)             => Left(s"PRICE(${cmd.symbol}) is zero")
+          case Some(px) if px > 0 =>
+            // Round down so a recurring quotient cannot spend more than the requested amount.
+            val context = new java.math.MathContext(34, java.math.RoundingMode.DOWN)
+            Right(BigDecimal(value.amount.bigDecimal.divide(px.bigDecimal, context)))
+          case Some(_)             => Left(s"PRICE(${cmd.symbol}) is zero or negative")
           case None                => Left(s"Missing PRICE(${cmd.symbol}) to convert ${value.amount} ${value.currency} to qty")
         }
     }
@@ -70,8 +75,12 @@ object Lowering {
       val qtyE = quantityFor(cmd, md)
 
       qtyE.map { qty =>
-        val id = s"$source-$idx-${System.nanoTime()}"
-        Instruction(id, cmd.action, cmd.symbol, qty, price = None, note = dec.detail)
+        val id = s"$source-$idx"
+        val currency = cmd.consideration match {
+          case ByValue(value) if value.currency != cmd.symbol => Some(value.currency)
+          case _ => None
+        }
+        Instruction(id, cmd.action, cmd.symbol, qty, price = md.price(cmd.symbol), note = dec.detail, currency = currency, explanation = dec.explanation)
       }
     }
 

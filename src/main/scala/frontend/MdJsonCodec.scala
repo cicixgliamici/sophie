@@ -22,7 +22,7 @@ import ujson._
  */
 object MdJsonCodec {
 
-  // Accetta sia "123.45" (string) sia 123.45 (number) e scrive come stringa
+  // Accept decimal strings and JSON numbers; write strings to preserve decimal precision.
   implicit val bigDecimalRW: ReadWriter[BigDecimal] =
     readwriter[ujson.Value].bimap[BigDecimal](
       bd => ujson.Str(bd.toString),

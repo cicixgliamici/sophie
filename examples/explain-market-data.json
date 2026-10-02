@@ -1,0 +1,7 @@
+{
+  "prices": { "MSFT": "100" },
+  "series": { "MSFT.volume": ["100", "900"] },
+  "indicatorOverrides": [
+    { "name": "RSI", "symbol": "MSFT", "period": 14, "value": "28" }
+  ]
+}

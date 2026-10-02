@@ -1,7 +1,7 @@
 package frontend
 
 import upickle.default._
-import frontend.MdJsonCodec.bigDecimalRW // riusa il codec BigDecimal tollerante
+import frontend.MdJsonCodec.bigDecimalRW // Reuse the codec that accepts decimal strings and JSON numbers.
 
 object PortfolioJson {
   /**
@@ -12,7 +12,8 @@ object PortfolioJson {
     */
   final case class PortfolioJ(
       positions: Map[String, BigDecimal],
-      cash: Option[BigDecimal] = None // optional for backward compatibility
+      cash: Option[BigDecimal] = None, // optional for backward compatibility
+      currency: String = "EUR" // old accounts used an implicit EUR base
   )
   implicit val pfRw: ReadWriter[PortfolioJ] = macroRW
 }

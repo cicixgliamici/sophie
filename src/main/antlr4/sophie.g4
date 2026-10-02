@@ -161,7 +161,7 @@ comparison
   : expr ((GT | LT | EQ | NEQ) expr)?
   ;
 
-// Espressioni aritmetiche
+// Arithmetic expressions
 expr
   : term ((PLUS | MINUS) term)*
   ;
@@ -172,12 +172,12 @@ term
   ;
 // Arithmetic term with multiplication/division
 
-// Foglie per l'aritmetica
+// Leaf operands and grouped arithmetic expressions
 primary
   : NUMBER
   | price_expr
   | series_operation
-  | LPAR expr RPAR        // parentesi aritmetiche
+  | LPAR expr RPAR        // Grouped arithmetic expression
   ;
 /*
   CHANGE #2: symbol in series/PRICE and NUMBER in agg_func

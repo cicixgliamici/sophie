@@ -43,7 +43,7 @@ Sophie programs are made of ordered statements.
   - `6000 EUR OF VWCE + 2000 USD OF AAPL + 0.1 BTC OF BTC`
 
 ### Conditions and expressions
-- Boolean logic: `AND`, `OR`
+- Boolean logic: `&&`, `||`
 - Comparisons: `>`, `<`, `=`, `!=`
 - Arithmetic: `+`, `-`, `*`, `/`
 - Price lookup: `PRICE(SYMBOL)`
@@ -59,8 +59,8 @@ Sophie programs are made of ordered statements.
 ```text
 BUY 1500 EUR OF MSFT IF PRICE(MSFT) < 420
 SELL QTY 0.25 OF BTC IF RSI(BTC, 14) > 70
-PORTFOLIO 6000 EUR OF VWCE + 2000 USD OF AAPL + 0.1 BTC OF BTC
-````
+PORTFOLIO = 6000 EUR OF VWCE + 2000 USD OF AAPL + 0.1 BTC OF BTC
+```
 
 ### What happens conceptually
 
@@ -173,7 +173,7 @@ sbt "runMain TuiMain"
 ### CLI mode
 
 ```bash
-sbt "runMain cli.SophieCli --file examples/cli_buy_sell.sophie --run --ledger ledger.ndjson --portfolio portfolio.json"
+sbt "runMain cli.SophieCli --file examples/cli_buy_sell.sophie --run --initial-cash 10000 --ledger ledger.ndjson --portfolio portfolio.json"
 ```
 
 Useful CLI options:
@@ -181,10 +181,14 @@ Useful CLI options:
 * `--file <path>`: input `.sophie` program
 * `--md <path>`: market data JSON (if omitted, demo data is used)
 * `--print-instructions`: print lowered IR JSON
+* `--explain`: show recorded condition values and short-circuit decisions without implicitly executing
+* `--explain-json <path>`: export all trade decisions as structured JSON
 * `--run`: execute instructions and persist outputs
 * `--ledger <path>`: ledger NDJSON path (default: `ledger.ndjson`)
 * `--portfolio <path>`: portfolio JSON path (default: `portfolio.json`)
 * `--receipt-file <path>`: append textual execution receipts
+* `--initial-cash <amount>`: explicit funding for a new or reset account (default: zero)
+* `--currency <code>`: base currency for a new or reset account (default: EUR)
 * `--reset-portfolio`: reset portfolio file without interactive prompt
 
 ---
@@ -201,9 +205,64 @@ Example demo market data is available at:
 
 ---
 
+## Shared trading engine
+
+Preview, TUI apply, and persisted execution use the same pure accounting engine.
+A batch is processed in statement order and accepted only if every executable trade
+is valid. A sale may fund a later purchase; a later invalid order rejects the whole
+batch. Buys debit cash, sells credit cash, and overselling is rejected.
+Quantities and execution prices must be strictly positive, including `QTY` trades.
+
+Accounts start with zero cash. To fund an interactive demo:
+
+```text
+:pf new 1000 EUR
+:set price MSFT 100
+BUY 200 EUR OF MSFT
+
+:pf preview
+:pf apply
+```
+
+The result is 2 MSFT and 800 EUR cash. Preview leaves the session unchanged.
+`:pf new` resets the account; `:pf new 1000 USD` selects USD instead.
+For CLI funding, use `--initial-cash 1000 --currency EUR` on a new account,
+or combine those flags with `--reset-portfolio`. Funding flags do not top up an
+existing account. A rejected batch does not persist a requested reset.
+
+Each account has one base currency. All supplied prices must be quoted in that
+currency; monetary orders in a different currency are rejected. FX conversion is
+not implemented. A value denominated in the traded symbol (such as `0.5 BTC OF BTC`)
+continues to represent asset quantity. Old portfolio and ledger JSON defaults to EUR.
+
+Lowering pins available prices and creates stable plan-local instruction IDs.
+IDs are not replay protection: executing the same IR twice submits two batches.
+The executor accepts an injected clock for reproducible event timestamps.
+
+File execution uses an account lock, atomic replacement of individual files, and a
+rollback journal. Interrupted transactions are recovered before the next execution
+with the same portfolio/ledger pair. See [storage details](docs/storage_and_persistence.md).
+
+## Explain strategy decisions
+
+Inspect values, thresholds and branches skipped by short-circuiting:
+
+```bash
+sbt "runMain cli.SophieCli --file examples/explain_decisions.sophie --md examples/explain-market-data.json --explain --explain-json tmp/decisions.json"
+```
+
+In the TUI, use `:explain` for the last plan or `:explain 1` for one trade.
+Explanations capture values during evaluation, distinguish false from unevaluated
+conditions, and identify computed indicators versus overrides. Executed orders
+retain the same trace in IR and ledger events. These traces explain condition
+selection; account checks still determine whether the plan can be applied.
+
+See [decision explanations](docs/decision_explanations.md) for the trace model,
+example output and JSON format.
+
 ## Current limitations
 
-* Only the first `PORTFOLIO` block is honored.
+* The public validation pipeline accepts at most one `PORTFOLIO` block. Allocations are reported as targets; automatic rebalancing is not implemented.
 * Missing market data and division by zero are runtime errors.
 * Indicator support is currently limited to `MAVG`, `EMA`, `STDDEV`, and `RSI`.
 * Only market-like `BUY`/`SELL` instructions are modeled (no advanced order types).

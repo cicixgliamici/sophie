@@ -6,6 +6,7 @@ object RunTuiSim {
   def main(args: Array[String]): Unit = {
     println("=== TUI Simulation 1: simple buy and apply ===")
     val inputs1 = Seq(
+      ":pf new 2000",
       ":set price MSFT 320",
       "BUY 1500 EUR OF MSFT;",
       "",
@@ -18,6 +19,7 @@ object RunTuiSim {
 
     println("=== TUI Simulation 2: paste mode and command handling ===")
     val inputs2 = Seq(
+      ":pf new 2000",
       ":set price MSFT 100",
       "BUY 100 EUR OF MSFT;",
       ":show last",
@@ -31,6 +33,7 @@ object RunTuiSim {
 
     println("=== TUI Simulation 3: missing price -> skip apply ===")
     val inputs3 = Seq(
+      ":pf new 2000",
       "BUY 100 EUR OF ABC;",
       "",
       ":pf preview",

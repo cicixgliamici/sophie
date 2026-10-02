@@ -13,8 +13,8 @@ object ReceiptPrinter {
   private val fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME.withZone(ZoneId.systemDefault())
 
   /**
-    * Produce le linee della ricevuta come valore puro (nessun effetto).
-    * Questo rende facile testare il formatting senza side-effects.
+    * Build receipt lines as a pure value without printing or writing files.
+    * Pure formatting lets tests inspect the receipt without performing I/O.
     */
   def receiptLines(events: List[LedgerEvent]): Vector[String] = {
     if (events.isEmpty) Vector.empty
@@ -48,8 +48,8 @@ object ReceiptPrinter {
   }
 
   /**
-    * Stampa le linee della ricevuta e opzionalmente le persiste su file.
-    * Si accetta un `TuiPrinter` per centralizzare/astrarre l'I/O (default: Console).
+    * Print receipt lines and optionally append them to a file.
+    * Inject a TuiPrinter to capture console output independently of file I/O.
     */
   def printReceipts(events: List[LedgerEvent], saveTo: Option[Path] = None, printer: TuiPrinter = DefaultPrinter): Unit = {
     val lines = receiptLines(events)

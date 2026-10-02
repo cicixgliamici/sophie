@@ -46,7 +46,7 @@ class PortfolioManager() {
     val base =
       if (state.positions.isEmpty) Vector(" - (empty)")
       else Vector.empty[String]
-    val cash = if (state.cash != 0) Vector(s" - cash: ${fmt(state.cash)}") else Vector.empty[String]
+    val cash = if (state.cash != 0) Vector(s" - cash: ${fmt(state.cash)} ${state.currency}") else Vector.empty[String]
 
     val (total, lines) = state.positions.toSeq
       .sortBy(_._1)
@@ -74,7 +74,7 @@ class PortfolioManager() {
     try {
       val p = Paths.get(path)
       Option(p.getParent).foreach(parent => if (!Files.exists(parent)) Files.createDirectories(parent))
-      val json = write(PortfolioJson.PortfolioJ(state.positions.filter(_._2 > 0), Some(state.cash)), indent = 2)
+      val json = write(PortfolioJson.PortfolioJ(state.positions.filter(_._2 > 0), Some(state.cash), state.currency), indent = 2)
       Files.writeString(p, json, UTF_8)
       Vector(s"Saved portfolio to $path")
     } catch { case NonFatal(e) => Vector(s"Error saving portfolio: ${e.getMessage}") }
@@ -84,74 +84,10 @@ class PortfolioManager() {
     try {
       val json = Files.readString(Paths.get(path), UTF_8)
       val pj = read[PortfolioJson.PortfolioJ](json)
-      val st = PortfolioState(pj.positions.withDefaultValue(BigDecimal(0)), pj.cash.getOrElse(BigDecimal(0)))
+      val st = PortfolioState(pj.positions.withDefaultValue(BigDecimal(0)), pj.cash.getOrElse(BigDecimal(0)), pj.currency)
       (st, Vector(s"Loaded portfolio from $path (positions=${st.positions.count(_._2>0)})"))
     } catch { case NonFatal(e) => (empty, Vector(s"Error loading portfolio: ${e.getMessage}")) }
   }
-
-  /**
-    * Compute the quantity (number of shares) corresponding to a trade consideration.
-    * - `ByQuantity` is already expressed in units.
-    * - `ByValue` needs price conversion unless the value currency matches the symbol.
-    *
-    * This helper is pure: given the same inputs it always returns the same
-    * output (no side-effects). In an imperative design this conversion might
-    * read shared mutable market data state; here we pass the price lookup as a
-    * function making the dependency explicit and testable.
-    */
-  private def computeQuantity(
-    consideration: ast.TradeConsideration,
-    sym: String,
-    mdPriceFn: String => Option[BigDecimal],
-    msgs: Vector[String]
-  ): (BigDecimal, Vector[String]) =
-    consideration match {
-      case ast.ByQuantity(qty) => (qty, msgs)
-      case ast.ByValue(value) if value.currency == sym => (value.amount, msgs)
-      case ast.ByValue(value) =>
-        mdPriceFn(sym) match {
-          case Some(px) if px != 0 => (value.amount / px, msgs)
-          case _ => (BigDecimal(0), msgs :+ s" ! Missing PRICE($sym) - cannot convert ${fmt(value.amount)} ${value.currency} to quantity")
-        }
-    }
-
-  /**
-    * Fold a sequence of trade decisions into an updated portfolio state.
-    * Returns (nextState, appliedCount, messages).
-    *
-    * Functional note: this is a pure transformation implemented as a fold
-    * (left-to-right). Using foldLeft keeps the implementation concise and
-    * explicit about how the accumulator `state` is transformed by each
-    * decision. In an imperative version we might iterate with a mutable map
-    * and update it in place; here we produce a new map on each update (but
-    * Scala's persistent collections make that efficient).
-    */
-  private def foldTrades(trades: Seq[TradeDecision], mdPriceFn: String => Option[BigDecimal], state: PortfolioState): (PortfolioState, Int, Vector[String]) =
-    trades.foldLeft((state, 0, Vector.empty[String])) {
-      case ((st, appl, msgs), d) =>
-        val sym = d.cmd.symbol
-        val (qty, msgs2) = computeQuantity(d.cmd.consideration, sym, mdPriceFn, msgs)
-
-        if (qty > 0) {
-          val cur = st.positions.withDefaultValue(BigDecimal(0))(sym)
-          d.cmd.action match {
-            case ast.Buy =>
-              val next = cur + qty
-              if (next != cur) (st.copy(positions = st.positions.updated(sym, next)), appl + 1, msgs2)
-              else (st, appl, msgs2 :+ s" ! Skipping BUY for $sym - no net change (qty=${fmt(qty)})")
-            case ast.Sell =>
-              if (cur == 0)
-                (st, appl, msgs2 :+ s" ! Skipping SELL ${fmt(qty)} $sym - no holdings to reduce")
-              else if (qty > cur)
-                (st, appl, msgs2 :+ s" ! Skipping SELL ${fmt(qty)} $sym - insufficient holdings (have ${fmt(cur)})")
-              else {
-                val next = cur - qty
-                if (next != cur) (st.copy(positions = st.positions.updated(sym, next)), appl + 1, msgs2)
-                else (st, appl, msgs2 :+ s" ! Skipping SELL for $sym - no net change (qty=${fmt(qty)})")
-              }
-          }
-        } else (st, appl, msgs2 :+ s" ! Skipping ${d.cmd.action} for $sym - computed quantity is 0")
-    }
 
   /**
     * General plan processing helper. Accepts the plan option, a price lookup
@@ -159,7 +95,7 @@ class PortfolioManager() {
     * Returns (newState, appliedCount, messages).
     *
     * This orchestrates the pure computations: extracting executable trades and
-    * delegating to `foldTrades`. All branching decisions are local and pure.
+    * delegating to `TradingEngine`. All branching decisions are local and pure.
     */
   private def processPlan(
     planOpt: Option[ExecutionPlan],
@@ -174,9 +110,18 @@ class PortfolioManager() {
         val exec = plan.trades.filter(_.shouldExecute)
         if (exec.isEmpty) (state, 0, Vector("No EXECUTE trades in last plan."))
         else {
-          val (finalState, applied, msgs) = foldTrades(exec, mdPriceFn, state)
-          val finalFiltered = finalState.copy(positions = finalState.positions.filter { case (_, q) => q > 0 })
-          (finalFiltered, applied, msgs :+ finalMsg(applied))
+          // Lower once and delegate every accounting rule to the shared pure engine.
+          val marketData = new MarketData {
+            def price(symbol: String): Option[BigDecimal] = mdPriceFn(symbol)
+            def series(symbol: String, field: String): Option[Vector[BigDecimal]] = None
+          }
+          val result = Lowering.from(plan, marketData).flatMap { instructions =>
+            TradingEngine.simulate(instructions, mdPriceFn, state)
+          }
+          result match {
+            case Left(error) => (state, 0, Vector(s"Plan rejected: $error", finalMsg(0)))
+            case Right(outcome) => (outcome.portfolio, outcome.fills.size, Vector(finalMsg(outcome.fills.size)))
+          }
         }
     }
 
@@ -209,7 +154,7 @@ class PortfolioManager() {
       if (applied > 0) {
         val header = Vector("Resulting portfolio:")
         val body = if (newState.positions.isEmpty) Vector(" - (empty)") else newState.positions.toSeq.sortBy(_._1).map { case (s, q) => s" - $s: qty=${fmt(q)}" }.toVector
-        header ++ body
+        header ++ body :+ s" - cash: ${fmt(newState.cash)} ${newState.currency}"
       } else Vector.empty[String]
     (state, msgs ++ previewLines)
   }

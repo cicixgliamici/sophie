@@ -2,88 +2,59 @@ package frontend
 
 import org.scalatest.funsuite.AnyFunSuite
 import engine._
-import ast._
-import scala.math.BigDecimal
-import testhelpers.TestHelpers._
 
-// Tests for PortfolioManager pure transition functions
-// - These exercises the pure state transition helpers (`pureApplyPlan` and `purePreviewPlan`)
-// - We cover typical and edge cases: applying buys, attempting sells with no holdings,
-//   preview behavior (non-mutating), and missing price handling.
-// This makes it easy to test portfolio logic without side-effects or file IO.
 class PortfolioManagerPureSpec extends AnyFunSuite {
+  private val manager = new PortfolioManager()
+  private val market = InMemoryMarketData(prices = Map("MSFT" -> BigDecimal(10)))
+  private def plan(source: String): ExecutionPlan = ProgramEvaluator.evaluate(source, market).plan
 
-  // Verify that applying a BUY instruction increases holdings by the expected quantity
-  test("pureApplyPlan applies buys and updates state") {
-    val pm = new PortfolioManager()
-    val initial = PortfolioState(Map("A" -> BigDecimal(1)), BigDecimal(0))
-    val plan = ExecutionPlan(List(mkTradeDecision(Buy, "A", BigDecimal(20), "EUR")), None)
-
-    val (newState, applied, msgs) = pm.pureApplyPlan(Some(plan), _ => Some(BigDecimal(10)), initial)
-    assert(applied == 1)
-    // amount 20 EUR at price 10 -> qty 2
-    assert(newState.positions("A") == BigDecimal(3))
-    assert(msgs.exists(_.contains("Applied 1 trade(s)")))
+  test("preview, apply and IR execution use the same cash and position transitions") {
+    val initial = PortfolioState(Map.empty, BigDecimal(100))
+    val batch = plan("BUY 60 EUR OF MSFT; SELL QTY 2 OF MSFT")
+    val preview = manager.purePreviewPlan(Some(batch), market.price, initial)
+    val applied = manager.pureApplyPlan(Some(batch), market.price, initial)
+    val instructions = Lowering.from(batch, market).toOption.get
+    val engine = Executor.preview(instructions, market, initial).toOption.get
+    assert(preview._1 == applied._1)
+    assert(applied._1 == engine.portfolio)
+    assert(applied._2 == 2)
+    assert(applied._1.positions("MSFT") == 4)
+    assert(applied._1.cash == 60)
+    assert(initial.cash == 100 && initial.positions.isEmpty)
+    assert(manager.previewPlan(Some(batch), market.price, initial)._1 == initial)
   }
 
-  // Ensure SELL is skipped when there are no holdings to reduce
-  test("pureApplyPlan skips sell when no holdings") {
-    val pm = new PortfolioManager()
-    val initial = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
-    val plan = ExecutionPlan(List(mkTradeDecision(Sell, "X", BigDecimal(10), "EUR")), None)
-
-    val (newState, applied, msgs) = pm.pureApplyPlan(Some(plan), _ => None, initial)
-    assert(applied == 0)
-    assert(newState.positions.isEmpty)
-    assert(msgs.exists(m => m.contains("computed quantity is 0") || m.contains("Skipping SELL")))
-  }
-  // Ensure SELL is skipped when holdings are insufficient for the quantity
-  test("pureApplyPlan skips sell when holdings are insufficient") {
-    val pm = new PortfolioManager()
-    val initial = PortfolioState(Map("X" -> BigDecimal(1)), BigDecimal(0))
-    val plan = ExecutionPlan(List(mkTradeDecision(Sell, "X", BigDecimal(2), "X")), None)
-
-    val (newState, applied, msgs) = pm.pureApplyPlan(Some(plan), _ => None, initial)
-    assert(applied == 0)
-    assert(newState.positions("X") == BigDecimal(1))
-    assert(msgs.exists(_.contains("insufficient holdings")))
-  }
-  
-  // Preview should return the new state without mutating the original portfolio passed in
-  test("purePreviewPlan does not mutate state") {
-    val pm = new PortfolioManager()
-    val initial = PortfolioState(Map("B" -> BigDecimal(2)), BigDecimal(0))
-    val plan = ExecutionPlan(List(mkTradeDecision(Buy, "B", BigDecimal(50), "EUR")), None)
-
-    val (previewState, applied, msgs) = pm.purePreviewPlan(Some(plan), _ => Some(BigDecimal(5)), initial)
-    // 50 EUR / 5 -> qty 10, so new qty would be 12
-    assert(applied == 1)
-    assert(previewState.positions("B") == BigDecimal(12))
-    // original state unchanged
-    assert(initial.positions("B") == BigDecimal(2))
+  test("an invalid later sell rejects the entire plan in preview and apply") {
+    val initial = PortfolioState(Map.empty, BigDecimal(100))
+    val batch = plan("BUY QTY 1 OF MSFT; SELL QTY 2 OF MSFT")
+    for (result <- List(manager.purePreviewPlan(Some(batch), market.price, initial),
+                        manager.pureApplyPlan(Some(batch), market.price, initial))) {
+      assert(result._1 == initial && result._2 == 0)
+      assert(result._3.exists(_.contains("insufficient holdings")))
+    }
   }
 
-  // Missing market price should result in no applied trades and a clear message
-  test("pureApplyPlan handles missing price with message") {
-    val pm = new PortfolioManager()
-    val initial = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
-    val plan = ExecutionPlan(List(mkTradeDecision(Buy, "Y", BigDecimal(100), "EUR")), None)
-
-    val (newState, applied, msgs) = pm.pureApplyPlan(Some(plan), _ => None, initial)
-    assert(applied == 0)
-    assert(msgs.exists(_.contains("Missing PRICE(Y)")))
+  test("buy requires cash and quantity trades also require a price") {
+    val batch = plan("BUY QTY 1 OF MSFT")
+    val unfunded = manager.pureApplyPlan(Some(batch), market.price, manager.empty)
+    assert(unfunded._2 == 0 && unfunded._3.exists(_.contains("insufficient cash")))
+    val funded = manager.empty.copy(cash = BigDecimal(100))
+    val noPrice = manager.pureApplyPlan(Some(batch), _ => None, funded)
+    assert(noPrice._1 == funded && noPrice._3.exists(_.contains("Missing PRICE(MSFT)")))
   }
 
-  test("pureApplyPlan applies explicit quantity trades without market data") {
-    val pm = new PortfolioManager()
-    val initial = PortfolioState(Map.empty.withDefaultValue(BigDecimal(0)), BigDecimal(0))
-    // A ByQuantity trade must be applied directly, without consulting PRICE(symbol).
-    val cmd = TradeCmd(Buy, ByQuantity(BigDecimal(2.5)), "MSFT", AlwaysTrue)
-    val plan = ExecutionPlan(List(TradeDecision(cmd, shouldExecute = true, "BUY QTY 2.5 OF MSFT")), None)
+  test("missing prices and non-positive prices leave the portfolio unchanged") {
+    val batch = plan("BUY 50 EUR OF MSFT")
+    val initial = manager.empty.copy(cash = BigDecimal(100))
+    for (price <- List(None, Some(BigDecimal(0)), Some(BigDecimal(-1)))) {
+      val result = manager.pureApplyPlan(Some(batch), _ => price, initial)
+      assert(result._1 == initial && result._2 == 0)
+    }
+  }
 
-    val (newState, applied, msgs) = pm.pureApplyPlan(Some(plan), _ => None, initial)
-    assert(applied == 1)
-    assert(newState.positions("MSFT") == BigDecimal(2.5))
-    assert(msgs.exists(_.contains("Applied 1 trade(s)")))
+  test("invalid initial funding in TUI preserves the existing account") {
+    val inputs = Seq(":pf new 100", ":pf new -1", ":pf new invalid",
+      ":set price MSFT 10", "BUY QTY 10 OF MSFT", "", ":pf apply")
+    assert(SophieTui.simulateSession(inputs)._1("MSFT") == 10)
   }
 }

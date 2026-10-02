@@ -9,7 +9,7 @@ This document gives a compact end-to-end walkthrough of a small Sophie program, 
 ```text
 BUY 1500 EUR OF MSFT IF PRICE(MSFT) < 420
 SELL QTY 0.25 OF BTC IF RSI(BTC, 14) > 70
-PORTFOLIO 6000 EUR OF VWCE + 2000 USD OF AAPL + 0.1 BTC OF BTC
+PORTFOLIO = 6000 EUR OF VWCE + 2000 USD OF AAPL + 0.1 BTC OF BTC
 ````
 
 This program contains three useful elements for understanding the language:
@@ -151,3 +151,5 @@ If you want to connect this walkthrough to the codebase:
 3. Inspect the AST model in `src/main/scala/ast`
 4. Inspect the evaluator and execution pipeline in `src/main/scala/engine`
 5. Run the CLI or tests to compare the conceptual flow with the implementation
+
+Execution requires explicit funding, for example `--initial-cash 10000`, and sufficient holdings for every sale. The entire batch is rejected if an order cannot be filled. Monetary orders must use the account currency.

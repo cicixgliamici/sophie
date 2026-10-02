@@ -48,7 +48,7 @@ final case class Value(amount: BigDecimal, currency: String)
 final case class Allocation(value: Value, symbol: String)
 
 // Trade considerations
-// A trade can be expressed either as a notional value to convert at execution time
+// A trade can be expressed either as a notional value converted during lowering
 // or as an explicit quantity that should be used as-is.
 sealed trait TradeConsideration extends AST
 final case class ByValue(value: Value) extends TradeConsideration

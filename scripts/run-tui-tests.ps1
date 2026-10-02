@@ -1,12 +1,12 @@
 # Run a full TUI test flow: build, test, simulate TUI, collect artifacts
 # Usage: .\scripts\run-tui-tests.ps1 (run from repository root on Windows PowerShell)
 #
-# Questo script è pensato per essere usato in locale o in CI su runner Windows.
-# - Imposta la console su UTF-8 per evitare problemi di encoding
-# - Esegue la build e i test (opzionale)
-# - Esegue il runner non-interattivo `RunTuiSim` (alias sbt `runTuiSim` disponibile)
-# - Copia i file di output (tmp/, data/, target/global-logging) in una cartella di artefatti
-# - Crea un manifesto e un archivio zip con gli artefatti raccolti
+# Run this script locally or in CI on Windows.
+# - Set the console to UTF-8 to avoid encoding problems.
+# - Optionally build the project and run the tests.
+# - Run the non-interactive TUI simulation.
+# - Collect output files from tmp/, data/, and target/global-logging.
+# - Create a manifest and a ZIP archive of the collected artifacts.
 
 param(
     [string]$OutDir = ".\tmp\tui_test_artifacts",
@@ -16,20 +16,20 @@ param(
 # Ensure output dir
 if (-not (Test-Path -Path $OutDir)) { New-Item -Path $OutDir -ItemType Directory | Out-Null }
 
-# 1) Impostiamo la code page su UTF-8
+# 1) Set the console code page to UTF-8.
 Write-Host "1/7 - Setting console to UTF-8 (chcp 65001)"
 chcp 65001 > $null
 
-# 2) Opzionale: build + test. L'output viene catturato in file UTF-8 per essere più leggibile
+# 2) Optionally build and test; capture UTF-8 logs for readable diagnostics.
 if (-not $SkipBuild) {
     Write-Host "2/7 - Running: sbt clean compile"
-    # Esegui la compilazione e cattura l'intero output in una stringa, poi salvalo come UTF-8
+    # Capture the complete compilation output before saving it as UTF-8.
     $compileOut = sbt clean compile 2>&1 | Out-String
     $compileOut | Out-File -FilePath (Join-Path $OutDir "sbt_compile_output.txt") -Encoding utf8
     Write-Host $compileOut
 
     Write-Host "3/7 - Running: sbt test"
-    # Esegui i test e salva l'output (utile per raccogliere report di test e fallimenti)
+    # Capture test output so the bundle includes failures and summaries.
     $testOut = sbt test 2>&1 | Out-String
     $testOut | Out-File -FilePath (Join-Path $OutDir "sbt_test_output.txt") -Encoding utf8
     Write-Host $testOut
@@ -37,14 +37,14 @@ if (-not $SkipBuild) {
     Write-Host "Skipping build/test as requested"
 }
 
-# 3) Eseguiamo il runner non-interattivo: usa l'alias sbt `runTuiSim` o `runMain RunTuiSim`
+# 3) Run the non-interactive TUI simulation.
 Write-Host "4/7 - Running TUI simulation runner (RunTuiSim)"
-# Usiamo runMain per compatibilità; l'alias sbt runTuiSim è definito in build.sbt
+# Invoke the simulation runner explicitly instead of using a command alias.
 $runOut = sbt "runMain RunTuiSim" 2>&1 | Out-String
 $runOut | Out-File -FilePath (Join-Path $OutDir "run_tuisim_output.txt") -Encoding utf8
 Write-Host $runOut
 
-# 4) Copia le directory/file che interessano in una cartella di artefatti
+# 4) Copy the relevant output directories into the artifact bundle.
 Write-Host "5/7 - Collecting artifacts (tmp/, data/, target/global-logging/ and script outputs)"
 $pathsToCollect = @("tmp", "data", "target/global-logging")
 foreach ($p in $pathsToCollect) {

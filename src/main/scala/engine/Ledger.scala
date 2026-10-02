@@ -25,7 +25,9 @@ final case class LedgerEvent(
                               price: BigDecimal,
                               notional: BigDecimal,
                               source: String,
-                              note: String
+                              note: String,
+                              currency: String = "EUR",
+                              explanation: Option[ConditionTrace] = None
                             )
 object LedgerEvent {
   implicit val tradeActionRW: ReadWriter[ast.TradeAction] =

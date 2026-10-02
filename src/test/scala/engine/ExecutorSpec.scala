@@ -7,7 +7,7 @@ import scala.math.BigDecimal
 import ast._
 
 class ExecutorSpec extends AnyFunSuite {
-  test("Executor.run with missing prices returns events for those instructions that can be resolved") {
+  test("Executor rejects a missing price without persisting earlier valid orders") {
     // Executor should fail fast when encountering an instruction whose price
     // cannot be resolved from explicit value or MarketData. Here only symbol B
     // lacks a price, so the run is expected to raise with a clear message.
@@ -21,6 +21,8 @@ class ExecutorSpec extends AnyFunSuite {
     val ledger = FileLedger(tmpLedger)
     val pfStore = FileJsonPortfolioStore(tmpPf)
 
+    pfStore.save(PortfolioState(Map.empty, BigDecimal(100)))
+    val before = Files.readString(tmpPf)
     val instrs = List(
       Instruction("i1", Buy, "A", BigDecimal(1), None, "note1"),
       Instruction("i2", Buy, "B", BigDecimal(2), None, "note2") // B price missing
@@ -31,6 +33,9 @@ class ExecutorSpec extends AnyFunSuite {
       Executor.run(instrs, md, pfStore, ledger, source = "test")
     }
     assert(ex.getMessage.contains("Missing PRICE(B)"))
+
+    assert(Files.readString(tmpPf) == before)
+    assert(ledger.readAll().isEmpty)
 
     // cleanup
     Files.deleteIfExists(tmpPf)

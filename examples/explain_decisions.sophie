@@ -1,0 +1,5 @@
+// Each example demonstrates a distinct outcome in the decision report.
+BUY 100 EUR OF MSFT IF RSI(MSFT, 14) < 30 && PRICE(MSFT) < 120
+SELL QTY 1 OF MSFT IF PRICE(MSFT) > 200 || MSFT.volume > 1000
+BUY QTY 1 OF MSFT IF PRICE(MSFT) > 200 && PRICE(UNKNOWN) > 0
+BUY QTY 1 OF MSFT IF PRICE(MSFT) < 120 || PRICE(UNKNOWN) > 0

@@ -43,6 +43,7 @@ class SophieTuiIrIntegrationSpec extends AnyFunSuite {
       // Execute the IR using a private temp directory so this test does not
       // contend with other test runs over a shared `data/` location.
       val pfStore = FileJsonPortfolioStore(pfPath)
+      pfStore.save(engine.PortfolioState(Map.empty, BigDecimal(100), "USD"))
       val ledger = FileLedger(ledgerPath)
       val events = engine.Executor.run(instrs, md, pfStore, ledger, source = "test")
 

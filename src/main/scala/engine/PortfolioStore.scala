@@ -19,7 +19,7 @@ trait PortfolioStore {
 }
 
 /** In‑memory representation of a portfolio used across the app and tests. */
-final case class PortfolioState(positions: Map[String, BigDecimal], cash: BigDecimal) {
+final case class PortfolioState(positions: Map[String, BigDecimal], cash: BigDecimal, currency: String = "EUR") {
   /** Ensure lookups for missing symbols default to zero rather than throwing. */
   def withDefaults: PortfolioState = copy(positions = positions.withDefaultValue(BigDecimal(0)))
 
@@ -31,8 +31,8 @@ final case class PortfolioState(positions: Map[String, BigDecimal], cash: BigDec
   * File-backed JSON implementation of [[PortfolioStore]].
   *
   * Keeps the on-disk format in sync with the TUI/CLI by reusing the
-  * `PortfolioJson` codecs, and ensures directories are created lazily by the
-  * caller (tests typically do this).
+  * `PortfolioJson` codecs. Atomic replacement creates parent directories and
+  * prevents a failed write from leaving a truncated portfolio snapshot.
   */
 final case class FileJsonPortfolioStore(path: Path) extends PortfolioStore {
   import frontend.PortfolioJson._
@@ -44,12 +44,13 @@ final case class FileJsonPortfolioStore(path: Path) extends PortfolioStore {
       val pj   = read[PortfolioJ](json)
       PortfolioState(
         positions = pj.positions.withDefaultValue(BigDecimal(0)),
-        cash = pj.cash.getOrElse(BigDecimal(0))
+        cash = pj.cash.getOrElse(BigDecimal(0)),
+        currency = pj.currency
       )
     }
 
   override def save(pf: PortfolioState): Unit = {
-    val json = write(PortfolioJ(pf.positions.filter(_._2 > 0), Some(pf.cash)), indent = 2)
-    Files.writeString(path, json, UTF_8)
+    val json = write(PortfolioJ(pf.positions.filter(_._2 > 0), Some(pf.cash), pf.currency), indent = 2)
+    FileExecutionStorage.writeAtomically(path, json)
   }
 }

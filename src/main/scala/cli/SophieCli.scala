@@ -47,7 +47,8 @@ object SophieCli {
   def main(args: Array[String]): Unit = {
     val rawConfig = parseArgs(args.toList)
     // Minimal behaviour: if user provided only --file (no flags), assume they want to run using defaults
-    val implicitRun = !rawConfig.printInstructions && !rawConfig.execute && rawConfig.sophieFile.isDefined
+    val implicitRun = !rawConfig.printInstructions && !rawConfig.execute && !rawConfig.explain &&
+      rawConfig.explanationFile.isEmpty && rawConfig.sophieFile.isDefined
     val config = if (implicitRun)
       rawConfig.copy(execute = true)
     else rawConfig
@@ -101,6 +102,10 @@ object SophieCli {
             p.allocations.foreach { a => println(s"   * ${a.value.amount} ${a.value.currency} OF ${a.symbol}") }
           }
 
+          // Explanations reuse recorded evaluation values, including decisions that were skipped.
+          if (config.explain) frontend.DecisionPrinter.explain(Some(plan)).foreach(println)
+          config.explanationFile.foreach(path => saveExplanations(plan, path))
+
           // 4) Optionally print instructions
           if (config.printInstructions) {
             Lowering.from(plan, md, config.source) match {
@@ -121,24 +126,20 @@ object SophieCli {
                 val ledgerPath = config.ledgerPath.getOrElse(Paths.get("ledger.ndjson"))
                 val portfolioPath = config.portfolioPath.getOrElse(Paths.get("portfolio.json"))
 
-                // If the portfolio file already exists, ask the user whether to reset it unless --reset-portfolio is provided
-                if (Files.exists(portfolioPath) && !config.resetPortfolio) {
-                  Console.err.print(s"Portfolio file $portfolioPath esiste. Vuoi eliminarlo e iniziare da zero? [y/N]: ")
-                  val ans = scala.io.StdIn.readLine().trim.toLowerCase
-                  if (ans == "y" || ans == "yes") {
-                    resetPortfolioFile(portfolioPath)
-                    println(s"Portfolio $portfolioPath resettato.")
-                  } else {
-                    println(s"Mantengo il portfolio esistente: $portfolioPath")
-                  }
-                } else if (Files.exists(portfolioPath) && config.resetPortfolio) {
-                  resetPortfolioFile(portfolioPath)
-                  println(s"Portfolio $portfolioPath resettato (--reset-portfolio).")
-                }
-
+                // Funding is explicit and only allowed when creating or resetting an account.
+                // Pass the initial state to Executor so a rejected batch cannot erase old holdings.
+                val reset = config.resetPortfolio || (Files.exists(portfolioPath) && {
+                  Console.err.print(s"Reset portfolio $portfolioPath? [y/N]: ")
+                  Option(scala.io.StdIn.readLine()).exists(answer => Set("y", "yes")(answer.trim.toLowerCase))
+                })
+                if ((config.initialCash.isDefined || config.currency.isDefined) && Files.exists(portfolioPath) && !reset)
+                  throw new IllegalArgumentException("--initial-cash requires a new portfolio or --reset-portfolio")
+                val initial = if (reset || !Files.exists(portfolioPath))
+                  Some(PortfolioState(Map.empty, config.initialCash.getOrElse(BigDecimal(0)), config.currency.getOrElse("EUR")))
+                else None
                 val ledger = FileLedger(ledgerPath)
                 val pfStore = FileJsonPortfolioStore(portfolioPath)
-                val events = Executor.run(inst, md, pfStore, ledger, config.source)
+                val events = Executor.run(inst, md, pfStore, ledger, config.source, initialPortfolio = initial)
                 println(s"Executed ${inst.length} instructions; ledger -> $ledgerPath, portfolio -> $portfolioPath")
                 val receiptPath = config.receiptFile.map(Paths.get(_))
                 ReceiptPrinter.printReceipts(events, receiptPath)
@@ -157,6 +158,8 @@ object SophieCli {
 
   private case class Config(
                              showHelp: Boolean = false,
+                             explain: Boolean = false,
+                             explanationFile: Option[Path] = None,
                              sophieFile: Option[Path] = None,
                              mdFile: Option[Path] = None,
                              printInstructions: Boolean = false,
@@ -165,6 +168,8 @@ object SophieCli {
                              portfolioPath: Option[Path] = None,
                              receiptFile: Option[String] = None,
                              source: String = "cli",
+                             currency: Option[String] = None,
+                             initialCash: Option[BigDecimal] = None,
                              resetPortfolio: Boolean = false
                            )
 
@@ -180,7 +185,16 @@ object SophieCli {
       case "--ledger" :: p :: t => go(t, acc.copy(ledgerPath = Some(Paths.get(p))))
       case "--portfolio" :: p :: t => go(t, acc.copy(portfolioPath = Some(Paths.get(p))))
       case "--receipt-file" :: p :: t => go(t, acc.copy(receiptFile = Some(p)))
+      case "--explain" :: t => go(t, acc.copy(explain = true))
+      case "--explain-json" :: path :: t => go(t, acc.copy(explanationFile = Some(Paths.get(path))))
       case "--source" :: s :: t => go(t, acc.copy(source = s))
+      case "--currency" :: value :: t =>
+        require(Set("EUR", "USD", "GBP", "BTC")(value), "Unsupported account currency")
+        go(t, acc.copy(currency = Some(value)))
+      case "--initial-cash" :: value :: t =>
+        val cash = BigDecimal(value)
+        require(cash >= 0, "Initial cash must be non-negative")
+        go(t, acc.copy(initialCash = Some(cash)))
       case "--reset-portfolio" :: t => go(t, acc.copy(resetPortfolio = true))
       case opt :: _ =>
         SLF4JLogger.error(s"Unknown option or missing argument: $opt")
@@ -193,14 +207,24 @@ object SophieCli {
     println("Sophie CLI - usage:")
     println("  --file <path>             : path to .sophie source to evaluate")
     println("  --md <path>               : path to market data JSON (optional, default: demo)")
+    println("  --explain                 : explain each decision without executing (unless --run)")
+    println("  --explain-json <path>     : export structured decision explanations")
     println("  --print-instructions      : print lowered instructions as JSON")
     println("  --run                     : execute instructions (write ledger & update portfolio)")
     println("  --ledger <path>           : ledger file path (default: ledger.ndjson)")
     println("  --portfolio <path>        : portfolio file path (default: portfolio.json)")
     println("  --receipt-file <path>     : append textual receipt to this file (optional)")
     println("  --source <id>             : source id used to tag instructions (default: cli)")
+    println("  --currency <code>         : base currency for a new or reset account (default EUR)")
+    println("  --initial-cash <amount>   : cash for a new or reset single-currency account")
     println("  --reset-portfolio         : if portfolio file exists, reset it without asking")
     println("  --help, -h                : show this help")
+  }
+
+  private def saveExplanations(plan: ExecutionPlan, path: Path): Unit = {
+    Option(path.toAbsolutePath.getParent).foreach(parent => Files.createDirectories(parent))
+    Files.writeString(path, write(DecisionReport.from(plan), indent = 2), java.nio.charset.StandardCharsets.UTF_8)
+    println(s"Wrote decision explanations to $path")
   }
 
   private def loadMdFromFile(p: Path): InMemoryMarketData = {
@@ -225,15 +249,6 @@ object SophieCli {
       else None
     }
 
-  }
-
-  // Reset portfolio file to an empty portfolio JSON format used by the project
-  private def resetPortfolioFile(p: Path): Unit = {
-    try {
-      val emptyPf = PortfolioJ(positions = Map.empty[String, BigDecimal], cash = Some(BigDecimal(0)))
-      val empty = upickle.default.write(emptyPf, indent = 2)
-      Files.writeString(p, empty)
-    } catch { case e: Exception => SLF4JLogger.error(s"Error resetting portfolio file: ${e.getMessage}") }
   }
 
 }

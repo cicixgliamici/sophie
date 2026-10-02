@@ -29,6 +29,7 @@ class SophieCliIntegrationSpec extends AnyFunSuite {
         "--file", "src/test/resources/programs/buy_ok.sophie",
         "--md", "src/main/resources/md_demo.json",
         "--run",
+        "--initial-cash", "1500",
         "--portfolio", portfolioPath.toString,
         "--ledger", ledgerPath.toString,
         "--reset-portfolio"
@@ -68,6 +69,7 @@ class SophieCliIntegrationSpec extends AnyFunSuite {
         "--file", "src/test/resources/programs/buy_ok.sophie",
         "--md", "src/main/resources/md_demo.json",
         "--run",
+        "--initial-cash", "1500",
         "--portfolio", portfolioPath.toString,
         "--ledger", ledgerPath.toString,
         "--reset-portfolio"
@@ -96,6 +98,7 @@ class SophieCliIntegrationSpec extends AnyFunSuite {
         "--file", missingProgram.toString,
         "--md", "src/main/resources/md_demo.json",
         "--run",
+        "--initial-cash", "1500",
         "--portfolio", portfolioPath.toString,
         "--ledger", ledgerPath.toString,
         "--reset-portfolio"
@@ -115,7 +118,7 @@ class SophieCliIntegrationSpec extends AnyFunSuite {
       try Files.walk(tmpDir).sorted(java.util.Comparator.reverseOrder()).forEach(p => Files.deleteIfExists(p)) catch { case _: Throwable => () }
     }
   }
- test("CLI reports an error when the market data file is missing") {
+  test("CLI reports an error when the market data file is missing") {
     val tmpDir = Files.createTempDirectory("sophie_cli_missing_md_")
     try {
       val portfolioPath = tmpDir.resolve("out_pf.json")
@@ -126,6 +129,7 @@ class SophieCliIntegrationSpec extends AnyFunSuite {
         "--file", "src/test/resources/programs/buy_ok.sophie",
         "--md", missingMd.toString,
         "--run",
+        "--initial-cash", "1500",
         "--portfolio", portfolioPath.toString,
         "--ledger", ledgerPath.toString,
         "--reset-portfolio"

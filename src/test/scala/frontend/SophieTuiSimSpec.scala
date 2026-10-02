@@ -9,7 +9,8 @@ import scala.math.BigDecimal
 class SophieTuiSimSpec extends AnyFunSuite {
   test("simulate a TUI session: set price, buy and apply using simulateSession") {
     val inputs = Seq(
-      ":pf new",
+      ":pf new 2000",
+      ":pf new 2000",
       ":set price MSFT 100",
       "BUY 100 EUR OF MSFT",
       "", // blank line to run program

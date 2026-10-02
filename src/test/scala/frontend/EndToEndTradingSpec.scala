@@ -17,7 +17,7 @@ class EndToEndTradingSpec extends AnyFunSuite {
     val pm = new PortfolioManager()
 
     // apply plan via PortfolioManager
-    val (afterBuy, _) = pm.applyPlan(Some(plan), sym => md.price(sym), pm.empty)
+    val (afterBuy, _) = pm.applyPlan(Some(plan), sym => md.price(sym), pm.empty.copy(cash = BigDecimal(100)))
     val pf = afterBuy.positions
     // 100 EUR / 100 = qty 1
     assert(pf("MSFT") == BigDecimal(1))
@@ -30,5 +30,6 @@ class EndToEndTradingSpec extends AnyFunSuite {
     val pf2 = afterSell.positions
     // selling 50 EUR at price 100 reduces qty by 0.5 (from 1 -> 0.5)
     assert(pf2("MSFT") == BigDecimal(0.5))
+    assert(afterSell.cash == BigDecimal(50))
   }
 }

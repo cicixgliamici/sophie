@@ -24,6 +24,7 @@ class ExecutorPortfolioTest extends AnyFunSuite {
       val pfStore = FileJsonPortfolioStore(pfPath)
       val ledgerPath = Files.createTempFile("sophie-ledger", ".ndjson")
       try {
+        pfStore.save(PortfolioState(Map.empty, BigDecimal(500)))
         val ledger = FileLedger(ledgerPath)
         val md = InMemoryMarketData(prices = Map("MSFT" -> BigDecimal(100)))
 
@@ -33,6 +34,7 @@ class ExecutorPortfolioTest extends AnyFunSuite {
         // portfolio file should contain MSFT: 5
         val loaded = pfStore.load()
         assert(loaded.positions("MSFT") == BigDecimal(5))
+        assert(loaded.cash == 0)
 
         // ledger should have one event
         val lines = ledger.readAll()
@@ -46,8 +48,8 @@ class ExecutorPortfolioTest extends AnyFunSuite {
     }
   }
 
-  test("Executor SELL reduces but not below zero") {
-    // Selling more than current holdings should clamp to zero instead of going negative.
+  test("Executor rejects a SELL exceeding holdings without changing files") {
+    // Reject overselling as a whole batch so the ledger cannot claim an impossible fill.
     withTempFile { pfPath =>
       val pfStore = FileJsonPortfolioStore(pfPath)
       // initialize portfolio with 2 BTC
@@ -58,10 +60,14 @@ class ExecutorPortfolioTest extends AnyFunSuite {
         val ledger = FileLedger(ledgerPath)
         val md = InMemoryMarketData(prices = Map("BTC" -> BigDecimal(20000)))
         val instr = Instruction(id = "i2", action = ast.Sell, symbol = "BTC", qty = BigDecimal(3), price = None, note = "sellall")
-        val events = Executor.run(List(instr), md, pfStore, ledger, source = "test")
+        val error = intercept[IllegalStateException] {
+          Executor.run(List(instr), md, pfStore, ledger, source = "test")
+        }
+        assert(error.getMessage.contains("insufficient holdings"))
+        assert(ledger.readAll().isEmpty)
 
         val loaded = pfStore.load()
-        assert(loaded.positions("BTC") == BigDecimal(0))
+        assert(loaded.positions("BTC") == BigDecimal(2))
       } finally {
         Files.deleteIfExists(ledgerPath)
       }

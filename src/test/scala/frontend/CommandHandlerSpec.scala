@@ -25,7 +25,7 @@ class CommandHandlerSpec extends AnyFunSuite {
       def runProg(session: SessionState, path: String)                                    = (session, emptyLog)
       def saveProg(session: SessionState, path: String)                                   = (session, emptyLog)
       def compileIr(session: SessionState, path: String)                                  = (session, emptyLog)
-      def execIr(session: SessionState, path: String)                                     = (session, emptyLog)
+      def execIr(session: SessionState, path: String, portfolio: engine.PortfolioState) = (session, portfolio, emptyLog)
       def evalBuffer(session: SessionState, buf: PasteBuffer)                             = (session, emptyLog)
     }
     val ch = new CommandHandler(dummyActions, pm)
@@ -36,9 +36,19 @@ class CommandHandlerSpec extends AnyFunSuite {
 
     assert(ch.handle(":pf new", session, portfolio, buf).continue)
     assert(ch.handle(":pf show", session, portfolio, buf).continue)
-    assert(ch.handle(":pf save tmp/test_pf.json", session, portfolio, buf).continue)
-    assert(ch.handle(":pf load tmp/test_pf.json", session, portfolio, buf).continue)
+    val temporary = java.nio.file.Files.createTempFile("sophie-command-", ".json")
+    try {
+      assert(ch.handle(s":pf save $temporary", session, portfolio, buf).continue)
+      assert(ch.handle(s":pf load $temporary", session, portfolio, buf).continue)
+    } finally java.nio.file.Files.deleteIfExists(temporary)
     assert(ch.handle(":pf apply", session, portfolio, buf).continue)
+    // Explaining a plan must not alter an active paste buffer or the account.
+    val plan = ProgramEvaluator.evaluate("BUY QTY 1 OF A IF 1", InMemoryMarketData()).plan
+    val evaluatedSession = session.copy(lastPlan = Some(plan))
+    val pendingBuffer = PasteBuffer(Vector("BUY QTY 2 OF A"))
+    val explained = ch.handle(":explain 1", evaluatedSession, portfolio, pendingBuffer)
+    assert(explained.session == evaluatedSession && explained.portfolio == portfolio)
+    assert(explained.buffer == pendingBuffer && explained.log.exists(_.contains("Trade 1:")))
     // Unknown commands should not abort the loop; they return true after printing help.
     assert(ch.handle(":unknowncmd", session, portfolio, buf).continue)
   }

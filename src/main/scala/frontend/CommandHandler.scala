@@ -26,6 +26,7 @@ object TuiCommand {
   case object Help extends TuiCommand
   case object ShowMd extends TuiCommand
   case object ShowLast extends TuiCommand
+  case class Explain(number: Option[String]) extends TuiCommand
   case class SetPrice(sym: String, value: String) extends TuiCommand
   case class SetSeries(sym: String, field: String, csv: String) extends TuiCommand
   case class SetOverride(name: String, sym: String, period: String, value: String) extends TuiCommand
@@ -33,7 +34,7 @@ object TuiCommand {
   case class SaveMd(path: String) extends TuiCommand
   case class RunProg(path: String) extends TuiCommand
   case class SaveProg(path: String) extends TuiCommand
-  case object ResetPortfolio extends TuiCommand
+  case class ResetPortfolio(cash: String = "0", currency: String = "EUR") extends TuiCommand
   case object ShowPortfolio extends TuiCommand
   case object ApplyPlan extends TuiCommand
   case object PreviewPlan extends TuiCommand
@@ -66,7 +67,7 @@ trait TuiActions {
   def runProg(session: SessionState, path: String): (SessionState, Vector[String])
   def saveProg(session: SessionState, path: String): (SessionState, Vector[String])
   def compileIr(session: SessionState, path: String): (SessionState, Vector[String])
-  def execIr(session: SessionState, path: String): (SessionState, Vector[String])
+  def execIr(session: SessionState, path: String, portfolio: PortfolioState): (SessionState, PortfolioState, Vector[String])
   def evalBuffer(session: SessionState, buf: PasteBuffer): (SessionState, Vector[String])
 }
 
@@ -76,6 +77,8 @@ class CommandHandler(actions: TuiActions, portfolioManager: PortfolioManager) {
     case List(":q") | List(":quit")              => TuiCommand.Quit
     case List(":help")                            => TuiCommand.Help
     case List(":show", "md")                     => TuiCommand.ShowMd
+    case List(":explain")                         => TuiCommand.Explain(None)
+    case List(":explain", number)                 => TuiCommand.Explain(Some(number))
     case List(":show", "last")                   => TuiCommand.ShowLast
     case List(":set", "price", sym, v)           => TuiCommand.SetPrice(sym, v)
     case List(":set", "series", s, f, csv)       => TuiCommand.SetSeries(s, f, csv)
@@ -84,7 +87,9 @@ class CommandHandler(actions: TuiActions, portfolioManager: PortfolioManager) {
     case List(":save", "md", path)               => TuiCommand.SaveMd(path)
     case List(":run", "prog", path)              => TuiCommand.RunProg(path)
     case List(":save", "prog", path)             => TuiCommand.SaveProg(path)
-    case List(":pf", "new")                      => TuiCommand.ResetPortfolio
+    case List(":pf", "new")                      => TuiCommand.ResetPortfolio()
+    case List(":pf", "new", cash, currency)      => TuiCommand.ResetPortfolio(cash, currency)
+    case List(":pf", "new", cash)                => TuiCommand.ResetPortfolio(cash)
     case List(":pf", "show")                     => TuiCommand.ShowPortfolio
     case List(":pf", "apply")                    => TuiCommand.ApplyPlan
     case List(":pf", "preview")                  => TuiCommand.PreviewPlan
@@ -107,6 +112,9 @@ class CommandHandler(actions: TuiActions, portfolioManager: PortfolioManager) {
       case TuiCommand.Help => CommandResult(true, session, portfolio, buf, actions.help)
 
       case TuiCommand.ShowMd => CommandResult(true, session, portfolio, buf, actions.showMd(session))
+
+      case TuiCommand.Explain(number) =>
+        CommandResult(true, session, portfolio, buf, DecisionPrinter.explain(session.lastPlan, number))
 
       case TuiCommand.ShowLast => CommandResult(true, session, portfolio, buf, actions.showLast(session))
 
@@ -138,9 +146,12 @@ class CommandHandler(actions: TuiActions, portfolioManager: PortfolioManager) {
         val (nextSession, log) = actions.saveProg(session, path)
         CommandResult(true, nextSession, portfolio, buf, log)
 
-      case TuiCommand.ResetPortfolio =>
-        val (nextPortfolio, log) = portfolioManager.reset()
-        CommandResult(true, session, nextPortfolio, buf, log)
+      case TuiCommand.ResetPortfolio(rawCash, currency) =>
+        // Invalid funding must not reset the account or terminate the interactive session.
+        scala.util.Try(BigDecimal(rawCash)).toOption.filter(cash => cash >= 0 && Set("EUR", "USD", "GBP", "BTC")(currency)) match {
+          case Some(cash) => CommandResult(true, session, portfolioManager.empty.copy(cash = cash, currency = currency), buf, Vector(s"Portfolio reset. Initial cash: $cash $currency"))
+          case None => CommandResult(true, session, portfolio, buf, Vector("Initial cash must be non-negative and currency must be EUR, USD, GBP or BTC"))
+        }
 
       case TuiCommand.ShowPortfolio =>
         val log = portfolioManager.show(portfolio, sym => session.md.price(sym))
@@ -167,8 +178,8 @@ class CommandHandler(actions: TuiActions, portfolioManager: PortfolioManager) {
         CommandResult(true, nextSession, portfolio, buf, log)
 
       case TuiCommand.ExecIr(path) =>
-        val (nextSession, log) = actions.execIr(session, path)
-        CommandResult(true, nextSession, portfolio, buf, log)
+        val (nextSession, nextPortfolio, log) = actions.execIr(session, path, portfolio)
+        CommandResult(true, nextSession, nextPortfolio, buf, log)
 
       case TuiCommand.EndBuffer =>
         if (buf.nonEmpty) {

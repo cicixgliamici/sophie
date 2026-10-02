@@ -16,7 +16,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
     val res = ProgramEvaluator.evaluate(prog, md)
     val plan = res.plan
     val pm = new PortfolioManager()
-    val (afterState, applied, msgs) = pm.pureApplyPlan(Some(plan), sym => md.price(sym), pm.empty)
+    val (afterState, applied, msgs) = pm.pureApplyPlan(Some(plan), sym => md.price(sym), pm.empty.copy(cash = BigDecimal(1500)))
     assert(applied == 1)
     val pf = afterState.positions
     assert(pf.contains("MSFT"), "Portfolio should contain MSFT after applying BUY")
@@ -28,6 +28,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
 
   test("paste_mode_commands_are_handled") {
     val inputs = Seq(
+      ":pf new 2000",
       ":set price MSFT 350",
       "BUY 100 EUR OF MSFT;",
       "", // submit the pasted program
@@ -45,6 +46,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
 
   test("multiple_buys_accumulate") {
     val inputs = Seq(
+      ":pf new 2000",
       ":set price MSFT 10",
       "BUY 100 EUR OF MSFT;",
       "BUY 50 EUR OF MSFT;",
@@ -59,6 +61,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
 
   test("preview_and_apply_with_missing_price_skips_trade") {
     val inputs = Seq(
+      ":pf new 2000",
       "BUY 100 EUR OF MST;", // MST has no price
       "",
       ":pf preview",
@@ -73,6 +76,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
     try {
       val mdPath = tmpDir.resolve("md.json")
       val inputsSave = Seq(
+      ":pf new 2000",
         ":set price MSFT 123.45",
         ":set series MSFT volume 1,2,3",
         ":set ovr RSI MSFT 14 42",
@@ -87,6 +91,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
       assert(md.indicatorOverrides.exists(o => o.name == "RSI" && o.symbol == "MSFT" && o.period == 14), s"Expected override in saved MD: $mdJson")
 
       val inputsLoad = Seq(
+      ":pf new 2000",
         s":load md $mdPath",
         "BUY 100 EUR OF MSFT;",
         "",
@@ -107,6 +112,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
       Files.writeString(progPath, "BUY 10 EUR OF MSFT;", UTF_8)
 
       val inputs = Seq(
+      ":pf new 2000",
         ":set price MSFT 10",
         s":run prog $progPath",
         ":pf apply",
@@ -132,6 +138,7 @@ class SophieTuiIntegrationSpec extends AnyFunSuite {
       Files.deleteIfExists(dataLedger)
 
       val inputs = Seq(
+      ":pf new 2000",
         ":set price MSFT 5",
         "BUY 10 EUR OF MSFT;",
         "",

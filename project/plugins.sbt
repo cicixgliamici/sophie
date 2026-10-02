@@ -1,8 +1,8 @@
 addSbtPlugin("org.mixql" % "sbt-antlr4" % "0.8.5")
 
-// sbt-assembly: permette di creare un fat JAR eseguibile (usato per distribuire la TUI come singolo jar)
-// Non lo eseguiamo ora; è solo predisposizione nel progetto.
+// Package the TUI and its runtime dependencies as one executable fat JAR.
+// Packaging is explicit: the assembly task does not run during ordinary compilation.
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "1.2.0")
 
-// scoverage plugin per generare report di code coverage
+// Generate coverage reports so reviewers can inspect which behavior is exercised.
 addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.0.6")

@@ -35,7 +35,7 @@ object ProgramEvaluator {
     val plan = Evaluator.evaluate(program, md)
 
     // Warn only for value-based trades that still need a price conversion.
-    // Quantity-based trades are already executable without market data.
+    // Quantity trades need no conversion, but execution still requires a positive price.
     val missingPrices: Seq[String] = plan.trades.flatMap { d =>
       val sym = d.cmd.symbol
       d.cmd.consideration match {

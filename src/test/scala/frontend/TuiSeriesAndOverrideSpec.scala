@@ -17,6 +17,7 @@ class TuiSeriesAndOverrideSpec extends AnyFunSuite {
   test("Series-based condition and indicator override affect execution") {
     // Setup: series data and override such that condition becomes true
     val inputs = Seq(
+      ":pf new 2000",
       ":set series BTC volume 10,2000000",
       ":set price BTC 50000",
       ":set ovr STDDEV BTC 20 60000",
@@ -27,8 +28,8 @@ class TuiSeriesAndOverrideSpec extends AnyFunSuite {
 
     val (pf, plan) = SophieTui.simulateSession(inputs)
 
-    // Expect BTC sell to be executed if conditions evaluate true given overrides
-    // Since we can't predict exact float comparisions, assert the simulation produced a plan and completed
+    // The BTC sell is selected when the conditions are true; account checks may reject it.
+    // Exact decimal inputs make the condition deterministic; holdings checks occur when applying.
     assert(plan.isDefined)
     // ensure the portfolio result is present (may be empty if sell couldn't be applied)
     assert(pf != null)

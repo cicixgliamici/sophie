@@ -15,8 +15,8 @@ import scala.math.BigDecimal.RoundingMode
   *
   * Structure:
   *   - The main entry point is `evaluate`, which processes all statements in the program.
-  *   - Helper methods recursively evaluate conditions and arithmetic expressions.
-  *   - Contains a nested `Indicators` object for basic financial indicator calculations.
+  *   - ConditionEvaluator records values while evaluating conditions and expressions.
+  *   - Indicators provides basic financial indicator calculations.
   *
   * Why another layer?
   *   - Decouples the AST structure from the evaluation logic and market data access.
@@ -24,7 +24,8 @@ import scala.math.BigDecimal.RoundingMode
   *   - Makes it easier to test, extend, and maintain the evaluation semantics.
   */
 
-final case class TradeDecision(cmd: TradeCmd, shouldExecute: Boolean, detail: String)
+final case class TradeDecision(cmd: TradeCmd, shouldExecute: Boolean, detail: String,
+                               explanation: Option[ConditionTrace] = None)
 final case class PortfolioPlan(allocations: List[Allocation])
 final case class ExecutionPlan(trades: List[TradeDecision], portfolio: Option[PortfolioPlan])
 
@@ -45,83 +46,16 @@ object Evaluator {
 
   /** Decide whether a trade should execute (i.e., IF condition holds). */
   private def decide(cmd: TradeCmd, md: MarketData): TradeDecision = {
-    val ok = evalCondition(cmd.condition, md)
+    val explanation = ConditionEvaluator.evaluate(cmd.condition, md)
+    val ok = explanation.result.get
     val what = cmd.action match { case Buy => "BUY"; case Sell => "SELL" }
     val target = describeConsideration(cmd.consideration, cmd.symbol)
     val reason =
       if (ok) s"$what $target - condition met"
       else    s"$what $target - condition NOT met"
-    TradeDecision(cmd, ok, reason)
+    TradeDecision(cmd, ok, reason, Some(explanation))
   }
 
-  // -------------------------
-  // Conditions and operands
-  // -------------------------
-
-  /**
-    * Recursively evaluates a boolean condition in the AST.
-    * Supports logical operators and parenthesis.
-    */
-  private def evalCondition(c: Condition, md: MarketData): Boolean = c match {
-    case AlwaysTrue => true
-    case Comparison(l, op, r) =>
-      val lv = evalOperand(l, md)
-      val rv = evalOperand(r, md)
-      // Compare the two operands using the specified comparison operator
-      op match {
-        case GT  => lv >  rv
-        case LT  => lv <  rv
-        case EQ  => lv == rv
-        case NEQ => lv != rv
-      }
-    case And(a, b)   => evalCondition(a, md) && evalCondition(b, md)
-    case Or(a, b)    => evalCondition(a, md) || evalCondition(b, md)
-    case Parens(cc)  => evalCondition(cc, md)
-  }
-
-  /**
-    * Recursively evaluates an arithmetic operand in the AST.
-    * Supports literals, price lookups, series operations, indicators, and arithmetic expressions.
-    */
-  private def evalOperand(o: Operand, md: MarketData): BigDecimal = o match {
-    case NumberLiteral(v)                 => v
-    case Price(sym)                       => md.price(sym).getOrElse(err(s"Missing PRICE($sym)"))
-    case SeriesOperation(sym, field)      => md.latest(sym, field).getOrElse(err(s"Missing $sym.$field"))
-    case AggFunc(name, symbol, periodDec) =>
-      val n = toIntExactPeriod(periodDec, s"$name($symbol, $periodDec)")
-      // Prefer explicit override; otherwise compute from CLOSE series
-      md.indicatorOverride(name, symbol, n).getOrElse {
-        val closes = md.series(symbol, "close").getOrElse(err(s"$name($symbol, $n) needs $symbol.close series"))
-        Indicators.compute(name, closes, n)
-      }
-    case Binary(op, l, r) =>
-      val a = evalOperand(l, md)
-      val b = evalOperand(r, md)
-      // Evaluate the arithmetic operation
-      op match {
-        case Add => a + b
-        case Sub => a - b
-        case Mul => a * b
-        case Div =>
-          if (b == 0) err("Division by zero")
-          else (a / b).setScale(10, RoundingMode.HALF_UP) // keep numeric stability
-      }
-  }
-
-  /** Throws an exception with the given message. Used for error handling. */
-  private def err[T](msg: String): T = throw new IllegalStateException(msg)
-
-  /**
-    * Converts a BigDecimal to Int only if it's an exact integer and in Int range.
-    * Used for indicator periods.
-    */
-  private def toIntExactPeriod(bd: BigDecimal, label: String): Int = {
-    val min = BigDecimal(Int.MinValue)
-    val max = BigDecimal(Int.MaxValue)
-    // isWhole is available on scala.math.BigDecimal
-    if (bd.isWhole && bd >= min && bd <= max) bd.toInt
-    else err(s"$label: period must be an integer within Int range")
-  }
 
 }
 

@@ -101,3 +101,45 @@ This document describes where the Sophie application stores files, which formats
   - Run a program from disk: `:run prog data/examples/buy_example.sophie`
   - Compile last plan to IR: `:compile ir data/out_instructions.json`
   - Execute IR (updates `data/portfolio.json` and appends `data/ledger.ndjson` by default): `:exec ir data/out_instructions.json`
+
+
+## Shared execution and recovery
+
+`TradingEngine.simulate` is a pure ordered transition. `PortfolioManager` lowers
+plans through the same IR used by `Executor.preview` and `Executor.run`; there is
+one policy for cash, holdings, prices and currency. Validation of the entire batch
+finishes before any portfolio or ledger target is changed.
+
+The executor supports `FileJsonPortfolioStore` and `FileLedger` as a transactional
+pair. Custom implementations of the old independent `save`/`append` interfaces are
+rejected for execution because those interfaces cannot guarantee a joint commit;
+they can still be used by other consumers. Use the pure preview API for simulation.
+
+For `portfolio.json`, the execution artifacts are:
+
+- `portfolio.json.lock`: persistent lock file; the operating-system lock is held
+  only during execution. It must not be deleted to bypass a running transaction.
+- `portfolio.json.transaction.json`: backup of both original files, including
+  whether each existed. This is runtime recovery data, not a trade event.
+
+The executor locks the account, recovers an unfinished transaction, reads the initial
+state, validates all orders, then writes the journal. Each target is replaced using
+an atomic rename in its own directory. Deleting the journal commits the batch.
+A write failure restores the original files; if recovery also fails, the journal
+remains and the exception includes the recovery error. The next execution retries
+recovery. Use the same ledger path; a different pair is rejected while recovery is
+pending. Never delete a pending journal manually.
+
+This is a local simulator protocol, not a database transaction. Independent file
+readers can see the interval between replacements, so they should read after a
+successful execution. External writers, direct ledger appends, manual saves and
+resets must not run concurrently with an execution. The protocol handles ordinary
+I/O errors and interrupted processes; it does not promise power-loss durability.
+Atomic replacement must be supported by the filesystem. Ledger contents are copied
+for a commit, so storage cost grows with history; a database transaction adapter is
+a future option for large workloads.
+
+Portfolio JSON now includes a base `currency` (default EUR for legacy files).
+Ledger events also record currency; IR orders carry an optional monetary currency.
+All market prices are assumed to be quoted in the account currency. No FX rates,
+fees, short selling, partial fills, or automatic portfolio rebalancing are modeled.
